@@ -2,3 +2,7 @@
 *.pkl
 *.eps
 *.pyc
+*.npy
+outputs/
+__pycache__/
+Methods/__pycache__/
