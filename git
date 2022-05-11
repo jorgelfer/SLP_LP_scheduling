@@ -1,0 +1,6 @@
+*.png
+*.eps
+*.pyc
+outputs/
+__pycache__/
+Methods/__pycache__/

@@ -1,0 +1,254 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Dec 21 09:43:57 2021
+
+@author: tefav
+"""
+import numpy as np
+import pandas as pd
+import math
+
+class sensitivityPy:
+
+    def __init__(self, dss, time):
+        self.dss = dss
+        self.time = time
+        
+    # Methods
+    def perturbDSS(self, node, kv, kw=10):
+        genName = node.replace(".","_")
+        self.__new_1ph_gen(genName, node, kv, kw)
+
+    def setLoads(self, load, loadNames):
+        
+        # rename nodes to explicit load names
+        load = load.loc[loadNames.index].rename(index=loadNames)
+                
+        # modify loads
+        self.__setAllLoads(load)
+        
+    def modifyDSS(self, out, baseVolts):
+        
+        # extract dispatch results
+        Pg, Pdr, Pchar, Pdis = self.__extractOutput(out)
+        
+        # modify loads
+        self.__modifyAllLoads(Pdr)
+        
+        # create PVs
+        self.__createPG(Pg, baseVolts)
+
+        # create Storage discharge
+        self.__createPG(Pdis, baseVolts)
+
+        # create Storage charge 
+        self.__createLoad(Pchar)
+
+    def voltageProfile(self):
+        
+        # get all node magnitudes
+        voltages = self.dss.circuit_all_bus_vmag()
+        
+        return np.asarray(voltages)
+    
+    def pjkFlows(self, lname):
+        
+        # get line flows
+        lines, lines_power = self.__getLinePowers()
+        
+        # organize line flows for node-based analysis
+        Pjk = self.__organizeFlows(lines, lines_power, lname)
+
+        return Pjk
+
+    def get_nodeBaseVolts(self):
+        
+        # create a directory to store voltages
+        node_base_voltage = dict()
+        
+        # get all buses
+        buses = self.dss.circuit_all_bus_names()
+        
+        # iterate over buses
+        for i, bus in enumerate(buses):
+            self.dss.circuit_set_active_bus(bus)
+            bus_voltage = self.dss.bus_kv_base() # VLN for 1phase buses
+            bus_nodes = self.dss.bus_nodes()
+            for n in bus_nodes:
+                node = bus + f'.{n}'
+                node_base_voltage[node] = bus_voltage
+        
+        return pd.Series(node_base_voltage)
+
+    def get_nodeLineNames(self):
+        # phase-based names
+        lname = list()
+        elements = self.dss.circuit_all_element_names()
+        
+        for i, elem in enumerate(elements):
+            self.dss.circuit_set_active_element(elem)
+            if "Line" in elem:
+                
+                # get node-based line names
+                buses = self.dss.cktelement_read_bus_names()
+                
+                # get this element node and discard the reference
+                nodes = [i for i in self.dss.cktelement_node_order() if i != 0]
+                
+                # reorder the number of nodes
+                nodes = np.asarray(nodes).reshape((int(len(nodes)/2),-1),order="F")                
+                
+                for t1n, t2n in zip(nodes[:,0],nodes[:,1]):
+                    lname.append("L"+ buses[0].split(".")[0] + f".{t1n}" + "-" + buses[1].split(".")[0] + f".{t1n}")
+    
+            elif "Transformer" in elem:
+                
+                # get node-based transformer names
+                buses = self.dss.cktelement_read_bus_names()
+                # get this element node and discard the reference
+                nodes = [i for i in self.dss.cktelement_node_order() if i != 0]
+                # reorder the number of nodes
+                nodes = np.asarray(nodes).reshape((int(len(nodes)/2),-1),order="F")
+            
+                for t1n, t2n in zip(nodes[:,0],nodes[:,1]):
+                    lname.append("T"+ buses[0].split(".")[0] + f".{t1n}" + "-" + buses[1].split(".")[0] + f".{t1n}")
+    
+        return lname
+    
+    # Helper methods
+    
+    def __extractOutput(self, out):
+        """Method to define outputs"""
+    
+        Pg   = out['Gen'] 
+        Pdr  = out['DR']   
+        Pchar= out['Pchar']  
+        Pdis = out['Pdis']  
+    
+        return Pg, Pdr, Pchar, Pdis 
+    
+    def __organizeFlows(self, lines, lines_power, lname):
+
+        Pjk = np.zeros([len(lname)]) # containing flows Pkm
+        Pkj = np.zeros([len(lname)]) # containing flows Pmk
+        
+        cont = 0
+        for l, line in enumerate(lines):
+
+            p = np.asarray(lines_power[line])
+
+            Pjk[cont: cont + int(len(p)/2)] = p[:int(len(p)/2)]
+            Pkj[cont: cont + int(len(p)/2)] = p[int(len(p)/2):]
+            cont += int(len(p)/2)
+
+        return Pjk
+
+    def __getLinePowers(self):
+
+        # prelocate 
+        lines = list()
+        lines_power_dict = dict()
+    
+        elements = self.dss.circuit_all_element_names()
+    
+        for i, elem in enumerate(elements):
+            self.dss.circuit_set_active_element(elem)
+            if "Line" in elem:
+                lines.append(elem)
+                lines_power_dict[elem] = self.dss.cktelement_powers()[0::2]
+
+            elif "Transformer" in elem:
+                lines.append(elem)
+                
+                if elem == 'Transformer.xfm1':
+                    lines_power_dict[elem] = self.dss.cktelement_powers()[0::2]
+                    del lines_power_dict[elem][3]
+                    del lines_power_dict[elem][-1]
+                else: 
+                    lines_power_dict[elem] = [i for i in self.dss.cktelement_powers()[0::2] if i != 0]
+
+        return lines, lines_power_dict
+
+    def __modifyAllLoads(self, Pdr):
+        "Method to modify loads from a DSS file according to dispatch"
+        
+        elems = self.dss.circuit_all_element_names()
+        for i, elem in enumerate(elems):
+            self.dss.circuit_set_active_element(elem)
+            if "Load" in elem:
+                
+                # extract load name
+                loadName = elem.split(".")[1]
+                
+                # check if dispatch allocated DR for this load
+                if Pdr.loc[loadName,self.time] != 0:
+                    # write load name
+                    self.dss.loads_write_name(loadName)
+                    # compute new demand
+                    newKw = self.dss.loads_read_kw() - Pdr.loc[loadName,self.time]
+                    # read kvar
+                    kvar = self.dss.loads_read_kvar()                
+                    # save kw
+                    self.__modifyLoad(newKw, kvar,  loadName)
+                    
+
+                    
+    def __setAllLoads(self, instDemand):
+        "Method to modify loads from a DSS file according to dispatch"
+        
+        elems = self.dss.circuit_all_element_names()
+        for i, elem in enumerate(elems):
+            self.dss.circuit_set_active_element(elem)
+            if "Load" in elem:   
+                # extract load name
+                loadName = elem.split(".")[1]
+                # write load name
+                self.dss.loads_write_name(loadName)
+                # read kvar
+                kvar = self.dss.loads_read_kvar()
+                # save kw
+                kw = instDemand[loadName]
+                if math.isnan(kw):
+                    breakpoint()
+                self.__modifyLoad(kw, kvar,  loadName)
+
+    def __modifyLoad(self, kw, kvar, load):
+        self.dss.text(f"edit load.{load} "
+                      f"kw={kw} "
+                      f"Pf=0.9")
+        
+    def __createPG(self, Pg, gen_kvs):
+        "Method to modify loads from a DSS file according to dispatch"
+        
+        for node in Pg.index:
+            # check if dispatch allocated power for this PV at this hour
+            if Pg.loc[node, self.time] != 0:
+                genName = node.replace(".","_")
+                self.__new_1ph_gen(genName, node, gen_kvs[node], Pg.loc[node, self.time])
+        
+    def __new_1ph_gen(self, gen, node, kv, kw):
+        self.dss.text(f"new generator.{gen} "
+                      f"phases=1 "
+                      f"kv={kv} "
+                      f"bus1={node} "
+                      f"kw={kw} "
+                      f"pf=1")
+
+    def __createLoad(self, Pchar):
+        "Method to modify loads from a DSS file according to dispatch"
+        
+        for node in Pchar.index:
+            # check if dispatch allocated power for this PV at this hour
+            if Pchar.loc[node, self.time] != 0:
+                loadName = node.replace(".","_")
+                self.__new_1ph_load(loadName, node, Pchar.loc[node, self.time])
+    
+    def __new_1ph_load(self, loadName, node, kw):
+        self.dss.text(f"new load.{loadName} "
+                      f"bus1={node} "
+                      f"phases=1 "
+                      f"conn=wye "
+                      f"model=1 "
+                      f"kw={kw} "
+                      f"pf=1")
+
