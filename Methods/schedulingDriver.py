@@ -15,19 +15,28 @@ from Methods.plotting import plottingDispatch
 from Methods.loadHelper import loadHelper
 
 # Methods
-def create_output(Pg, Pdr, Pchar, Pdis, LMP, load, PTDF, lnodes, Snodes, PVnodes, timeVec):
+def create_output(Pg, Pdr, Pchar, Pdis, LMP, load, PTDF, lnodes, Snodes, PVnodes, timeVec, PV, storage):
     """function to create outputs"""
-
-    outGen = pd.DataFrame(Pg[PVnodes,:], np.asarray(PTDF.columns[PVnodes]), timeVec) 
     outLMP = pd.DataFrame(LMP[lnodes,:], np.asarray(PTDF.columns[lnodes]), timeVec) 
     lnames = [load.loc[n] for n in PTDF.columns[lnodes]]
-    outDR = pd.DataFrame(Pdr[lnodes,:], np.asarray(lnames), timeVec) 
-    outPchar = pd.DataFrame(Pchar, np.asarray(PTDF.columns[Snodes]), timeVec) 
-    outPdis = pd.DataFrame(Pdis, np.asarray(PTDF.columns[Snodes]), timeVec) 
+    outDR = pd.DataFrame(Pdr[lnodes,:], np.asarray(lnames), timeVec)
+    
+    # check PV
+    if PV:
+        outGen = pd.DataFrame(Pg[PVnodes,:], np.asarray(PTDF.columns[PVnodes]), timeVec)
+    else:
+        outGen = None
+    # check storage
+    if storage:
+        outPchar = pd.DataFrame(Pchar, np.asarray(PTDF.columns[Snodes]), timeVec) 
+        outPdis = pd.DataFrame(Pdis, np.asarray(PTDF.columns[Snodes]), timeVec) 
+    else:
+        outPchar = None
+        outPdis = None
 
     return outGen, outDR, outPchar, outPdis, outLMP
 
-def create_battery(PTDF, pointsInTime, sbus='83'):
+def create_battery(PTDF, pointsInTime, sbus='83', batSize=300):
     """function to define battery parameters"""
 
     batt = dict()
@@ -38,13 +47,18 @@ def create_battery(PTDF, pointsInTime, sbus='83'):
     BatIncidence[PTDF.columns == sbus +'.2', 1] = 1
     BatIncidence[PTDF.columns == sbus +'.3', 2] = 1
     batt['BatIncidence'] = BatIncidence
-    BatSizes = 300 * np.ones((1,numBatteries))
+    
+    BatSizes = batSize * np.ones((1,numBatteries))
     batt['BatSizes'] = BatSizes
+    
     BatChargingLimits = (24/pointsInTime)*100*np.ones((1,numBatteries))
     batt['BatChargingLimits'] = BatChargingLimits
     BatEfficiencies = 0.97*np.ones((1,numBatteries))
     batt['BatEfficiencies'] = BatEfficiencies
-    BatInitEnergy = BatSizes * 0.4 
+    
+    np.random.seed(2022) # Set random seed so results are repeatable
+    BatInitEnergy = BatSizes * np.random.uniform(0.5, 0.8, size=(1,numBatteries)) 
+    
     batt['BatInitEnergy'] = BatInitEnergy
     Pbatcost = 0.01
     batt['Pbatcost'] = Pbatcost
@@ -88,7 +102,7 @@ def load_generationCosts(script_path, n, pointsInTime, freq):
     
     return gCost, cost_wednesday
 
-def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1bus='634', pv2bus='680'):
+def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1bus='634', pv2bus='680', pvSize=100):
     '''function to Define the utility scale PVs'''    
 
     nodesPV1 = [pv1bus +'.1',pv1bus +'.2',pv1bus +'.3']
@@ -100,8 +114,8 @@ def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1b
     PVnodes = np.any(np.concatenate([PV1,PV2],axis=1), axis=1)
     
     # define the maximum output
-    Gmax[np.where(np.any(PV1,axis=1))[0]] =  200        #% Utility scale Solar PV    
-    Gmax[np.where(np.any(PV2,axis=1))[0]] =  100        #% Utility scale Solar PV
+    Gmax[np.where(np.any(PV1,axis=1))[0]] =  pvSize        #% Utility scale Solar PV    
+    Gmax[np.where(np.any(PV2,axis=1))[0]] =  pvSize        #% Utility scale Solar PV
 
     if pv1bus == pv2bus:
         Gmax[np.where(np.any(PV1,axis=1))[0]] =  300        #% Utility scale Solar PV
@@ -195,7 +209,21 @@ def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
 # define the type of analysis;
 
     
-def schedulingDriver(output_dir, iterName, freq, script_path, case, outDSS, dispatchType, storage=True, sbus='83', PF=True, PV=True, pv1bus='66', pv2bus='80', voltage=True, DR=True, EV=False, plot=False):
+def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, PF=True, voltage=True, DR=True, plot=False):
+    
+    # define Storage and PV
+    if batSize == 0:
+        storage=False
+    else:
+        storage=True
+    sbus='83'
+
+    if pvSize == 0:
+        PV=False
+    else:
+        PV=True
+    pv1bus='66'
+    pv2bus='80' 
 
     # extract DSS results
     loadNames     = outDSS['loadNames'] 
@@ -219,7 +247,7 @@ def schedulingDriver(output_dir, iterName, freq, script_path, case, outDSS, disp
     l = len(PTDF)
         
     # Storage
-    batt = create_battery(PTDF, pointsInTime, sbus)
+    batt = create_battery(PTDF, pointsInTime, sbus, batSize)
     
     #Penalty factors
     if PF:
@@ -253,7 +281,7 @@ def schedulingDriver(output_dir, iterName, freq, script_path, case, outDSS, disp
     
     #PV system
     if PV:
-        Gmax, gCost, PVnodes, PVProfile = create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1bus, pv2bus)
+        Gmax, gCost, PVnodes, PVProfile = create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1bus, pv2bus, pvSize)
         # Normal gen
         max_profile = np.kron(Gmax, np.ones((1,pointsInTime)))
         # PV nodes
@@ -275,10 +303,10 @@ def schedulingDriver(output_dir, iterName, freq, script_path, case, outDSS, disp
     # call the OPF method
     if dispatchType == 'SLP':
         # create an instance of the dispatch class
-        dispatch_obj = SLP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp)
+        dispatch_obj = SLP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage)
         x, m, LMP = dispatch_obj.PTDF_SLP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0, violatingLines)
     else:
-        dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, PVnodes)
+        dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage)
         x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0, violatingLines)
     
     #Create plot object
@@ -298,7 +326,7 @@ def schedulingDriver(output_dir, iterName, freq, script_path, case, outDSS, disp
 
     lnodes = np.where(demandProfilei)[0]    
     # Define the output as Pandas DataFrame
-    outGen, outDR, outPchar, outPdis, outLMP = create_output(Pg, Pdr, Pchar, Pdis, LMP_Pg, loadNames, PTDF, lnodes=lnodes, Snodes=Snodes, PVnodes=PVnodes, timeVec=v_0.columns)
+    outGen, outDR, outPchar, outPdis, outLMP = create_output(Pg, Pdr, Pchar, Pdis, LMP_Pg, loadNames, PTDF, lnodes=lnodes, Snodes=Snodes, PVnodes=PVnodes, timeVec=v_0.columns, PV=PV, storage=storage)
     
     if plot:
         

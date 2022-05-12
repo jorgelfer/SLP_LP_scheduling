@@ -37,16 +37,20 @@ class sensitivityPy:
         Pg, Pdr, Pchar, Pdis = self.__extractOutput(out)
         
         # modify loads
-        self.__modifyAllLoads(Pdr)
+        if Pdr.any(axis=None):
+            self.__modifyAllLoads(Pdr)
         
         # create PVs
-        self.__createPG(Pg, baseVolts)
+        if Pg is not None:
+            self.__createPG(Pg, baseVolts)
 
         # create Storage discharge
-        self.__createPG(Pdis, baseVolts)
+        if Pdis is not None:
+            self.__createPG(Pdis, baseVolts)
 
         # create Storage charge 
-        self.__createLoad(Pchar)
+        if Pchar is not None:
+            self.__createLoad(Pchar)
 
     def voltageProfile(self):
         

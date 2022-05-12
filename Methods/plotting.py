@@ -1,5 +1,3 @@
-
-#required for plotting
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 20})
 # from matplotlib.patches import StepPatch
@@ -65,7 +63,7 @@ class plottingDispatch:
         vpu = v[indexDemand.values] / (1000*vBase[indexDemand.values])
         
         # create a dataframe for limits
-        limits = np.concatenate([0.95*np.ones((1, self.PointsInTime)), 1.05*np.ones((1, self.PointsInTime))], axis = 0)
+        limits = np.concatenate([0.96*np.ones((1, self.PointsInTime)), 1.04*np.ones((1, self.PointsInTime))], axis = 0)
         dfLimits = pd.DataFrame(limits, index = ['lower limit', 'upper limit'], columns = vpu.columns)
         
         plt.clf()

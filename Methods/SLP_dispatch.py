@@ -13,7 +13,7 @@ from scipy import sparse
 
 class SLP_dispatch:
 
-    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp):
+    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage):
         # constructor
         ###########
         
@@ -34,8 +34,9 @@ class SLP_dispatch:
         self.clin = clin                 #"cost of lines"
         self.cdr = cdr                   # cost of demand response
         self.v_base = v_base             #Base voltage of the system in volts
-        self.storage = True
         self.DR = True
+
+        self.storage = storage 
 
         # correct the voltage sensitivity by the penalty factor
         dvdp_pf = self.ipf.values.T * dvdp.values 
@@ -115,8 +116,8 @@ class SLP_dispatch:
 
         # define limits 
         v_base = np.reshape(self.v_base.values.T, (1, np.size(self.v_base.values)), order="F")
-        v_lb = -(950 * v_base)
-        v_ub = (1050 * v_base)
+        v_lb = -(960 * v_base)
+        v_ub = (1040 * v_base)
 
         # compute matrices 
         A_v, b_v = self.__buildSensitivityInequality(self.dvdp, v_0, v_lb, v_ub)

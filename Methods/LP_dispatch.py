@@ -13,7 +13,7 @@ from scipy import sparse
 
 class LP_dispatch:
 
-    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, PVnodes):
+    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage):
         # constructor
         ###########
         
@@ -34,9 +34,9 @@ class LP_dispatch:
         self.clin = clin                 #"cost of lines"
         self.cdr = cdr                   # cost of demand response
         self.v_base = v_base             #Base voltage of the system in volts
-        self.storage = True
         self.DR = True
-        self.PVnodes = PVnodes
+
+        self.storage = storage 
 
         # correct the voltage sensitivity by the penalty factor
         self.dvdp = dvdp
@@ -136,8 +136,8 @@ class LP_dispatch:
 
         # define limits 
         v_base = np.reshape(self.v_base.values.T, (1, np.size(self.v_base.values)), order="F")
-        v_lb = -(950 * v_base)
-        v_ub = (1050 * v_base)
+        v_lb = -(960 * v_base)
+        v_ub = (1040 * v_base)
 
         # compute matrices 
         A, b = self.__buildSensitivityInequality(self.dvdp_pf, v_0, v_lb, v_ub)
@@ -150,15 +150,11 @@ class LP_dispatch:
             
         dxdp = dxdp.values # remove the dataframe
 
-        #PV impact
-        PVdxdp = np.zeros((self.n,self.n))
-        PVdxdp[:,self.PVnodes] = dxdp[:,self.PVnodes] # penalty factor corrected
-        
         # Define A
         if self.DR:
             # define A
-            A = np.block([[-PVdxdp, -dxdp, np.zeros((self.n,self.l))],     # -d/dp * Pg - dv/dp * Pdr
-                           [PVdxdp, dxdp, np.zeros((self.n,self.l))]])     # d/dp * Pg + dv/dp * Pdr
+            A = np.block([[-dxdp, -dxdp, np.zeros((self.n,self.l))],     # -d/dp * Pg - dv/dp * Pdr + 0*Pjk
+                           [dxdp, dxdp, np.zeros((self.n,self.l))]])     # d/dp * Pg + dv/dp * Pdr + 0*Pjk
             A = sparse.kron(sparse.csr_matrix(A), sparse.csr_matrix(np.eye(self.pointsInTime)))
         else:
             # define A
