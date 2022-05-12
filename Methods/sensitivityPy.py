@@ -15,17 +15,21 @@ class sensitivityPy:
         self.time = time
         
     # Methods
-    def perturbDSS(self, node, kv, kw=10):
+    def perturbDSS(self, node, kv, kw, P):
         genName = node.replace(".","_")
-        self.__new_1ph_gen(genName, node, kv, kw)
+        if P:
+            self.__new_1ph_gen(genName, node, kv, kw, kvar=0)
+        else:
+            self.__edit_1ph_gen(genName, node, kw=0, kvar=kw)
 
-    def setLoads(self, load, loadNames):
+    def setLoads(self, loadP, loadQ, loadNames):
         
         # rename nodes to explicit load names
-        load = load.loc[loadNames.index].rename(index=loadNames)
+        loadP = loadP.loc[loadNames.index].rename(index=loadNames)
+        loadQ = loadQ.loc[loadNames.index].rename(index=loadNames)
                 
         # modify loads
-        self.__setAllLoads(load)
+        self.__setAllLoads(loadP, loadQ)
         
     def modifyDSS(self, out, baseVolts):
         
@@ -52,7 +56,7 @@ class sensitivityPy:
         return np.asarray(voltages)
     
     def pjkFlows(self, lname):
-        
+          
         # get line flows
         lines, lines_power = self.__getLinePowers()
         
@@ -193,7 +197,7 @@ class sensitivityPy:
                     
 
                     
-    def __setAllLoads(self, instDemand):
+    def __setAllLoads(self, instDemandP, instDemandQ):
         "Method to modify loads from a DSS file according to dispatch"
         
         elems = self.dss.circuit_all_element_names()
@@ -205,9 +209,9 @@ class sensitivityPy:
                 # write load name
                 self.dss.loads_write_name(loadName)
                 # read kvar
-                kvar = self.dss.loads_read_kvar()
+                kvar = instDemandQ[loadName]
                 # save kw
-                kw = instDemand[loadName]
+                kw = instDemandP[loadName]
                 if math.isnan(kw):
                     breakpoint()
                 self.__modifyLoad(kw, kvar,  loadName)
@@ -215,7 +219,7 @@ class sensitivityPy:
     def __modifyLoad(self, kw, kvar, load):
         self.dss.text(f"edit load.{load} "
                       f"kw={kw} "
-                      f"Pf=0.9")
+                      f"kvar={kvar}")
         
     def __createPG(self, Pg, gen_kvs):
         "Method to modify loads from a DSS file according to dispatch"
@@ -224,15 +228,20 @@ class sensitivityPy:
             # check if dispatch allocated power for this PV at this hour
             if Pg.loc[node, self.time] != 0:
                 genName = node.replace(".","_")
-                self.__new_1ph_gen(genName, node, gen_kvs[node], Pg.loc[node, self.time])
+                self.__new_1ph_gen(genName, node, gen_kvs[node], Pg.loc[node, self.time], kvar=0)
         
-    def __new_1ph_gen(self, gen, node, kv, kw):
+    def __new_1ph_gen(self, gen, node, kv, kw, kvar):
         self.dss.text(f"new generator.{gen} "
                       f"phases=1 "
                       f"kv={kv} "
                       f"bus1={node} "
                       f"kw={kw} "
-                      f"pf=1")
+                      f"kvar={kvar}")
+
+    def __edit_1ph_gen(self, gen, kw, kvar):
+        self.dss.text(f"edit generator.{gen} "
+                      f"kw={kw} "
+                      f"kvar={kvar}")
 
     def __createLoad(self, Pchar):
         "Method to modify loads from a DSS file according to dispatch"

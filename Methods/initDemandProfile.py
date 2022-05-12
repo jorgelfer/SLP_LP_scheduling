@@ -9,11 +9,13 @@ Extract from opendss the native load and multiply it by a load shape
 import pandas as pd
 import pathlib
 from Methods.loadHelper import loadHelper
+import numpy as np
 
 def get_1ph_demand(dss, mv_node_name):
     "Method to extract the demand from a feeder"
     # create a dictionary from node names
     load_power_dict = {key: 0 for key in mv_node_name}
+    load_Q_dict = {key: 0 for key in mv_node_name}
     loadNameDict = dict()
     
     elems = dss.circuit_all_element_names()
@@ -36,8 +38,9 @@ def get_1ph_demand(dss, mv_node_name):
             
             # save kw
             load_power_dict[bus] = dss.loads_read_kw()
+            load_Q_dict[bus] = dss.loads_read_kvar()
             
-    return pd.Series(loadNameDict), pd.Series(load_power_dict)         
+    return pd.Series(loadNameDict), pd.Series(load_power_dict), pd.Series(load_Q_dict)         
 
 def load_hourlyDemand(scriptPath, numLoads, freq):
     hourlyDemand_file = pathlib.Path(scriptPath).joinpath("inputs", "HourlyDemands100.xlsx")
@@ -80,48 +83,42 @@ def getInitDemand(scriptPath, dss, freq):
     nodeNames = dss.circuit_all_node_names()
     
     # get native load
-    loadNames, loadKws = get_1ph_demand(dss, nodeNames)
+    loadNames, loadKws, loadKvars = get_1ph_demand(dss, nodeNames)
     
     # get native loadshape, 
     _, genBeta = load_GenerationMix(scriptPath, freq)
 
     # expand dims of native load
     demandProfile = loadKws.to_frame()
+    demandQrofile = loadKvars.to_frame()
     
     # Expand feeder demand for time series analysis
     demandProfile =  demandProfile.values @ genBeta.values.T # 2018-08-14
+    demandQrofile =  demandQrofile.values @ genBeta.values.T # 2018-08-14
 
-    # create data frame
+    # Active Power df 
     dfDemand = pd.DataFrame(demandProfile) 
     dfDemand.index = loadKws.index 
-    
-    
-    #############
-    # # # get real load
+    dfDemand.columns = genBeta.index.strftime('%H:%M')
+
+    # get real load
     #############
     
     realDemand = load_hourlyDemand(scriptPath, len(loadNames), freq)
     realDemand = realDemand.T
     realDemand = realDemand[:len(loadNames)]
-    
     realDemand = 8*realDemand
-    
-    # # change of basis #######################################################:
-    # # maxDemand = realDemand.max(axis=1)
-    # # realDemand = realDemand.divide(maxDemand, axis=0)
-    # # # new basis
-    # # maxNativeLoad = loadKws.iloc[loadKws.to_numpy().nonzero()]
-    # # maxNativeLoad = maxNativeLoad.reset_index(drop=True)
-    # # realDemand = realDemand.multiply(maxNativeLoad, axis=0)
-    # ##########################################################################
-    
     dfDemand.loc[loadNames.index,:] = realDemand.values
-    
-    #############
-    # # # get real load
-    #############
-    
-    # define the column names
-    dfDemand.columns = genBeta.index.strftime('%H:%M')
 
-    return loadNames, dfDemand
+    #Reactive Power df
+    #if fixed power factor:
+    # random power factors
+    PF = np.random.uniform(0.8, 1, size=len(dfDemand.index))
+    dfDemandQ = (np.tan(np.arccos(PF)) * dfDemand.T).T
+    # else:
+    #dfDemandQ = pd.DataFrame(demandQrofile) 
+    #dfDemandQ.index = loadKvars.index 
+    #dfDemandQ.columns = genBeta.index.strftime('%H:%M')
+    
+
+    return loadNames, dfDemand, dfDemandQ

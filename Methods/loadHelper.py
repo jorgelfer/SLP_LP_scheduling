@@ -69,10 +69,9 @@ class loadHelper:
         if self.price:
             df = df.resample(self.finalFreq).bfill()
         else:
-            df = df.resample(self.finalFreq).bfill()
-            # df = df.resample(self.finalFreq).mean()
-            # #call the interpolate pandas method
-            # df = df.interpolate(method='polynomial', order=3)
+            #df = df.resample(self.finalFreq).bfill()
+            df = df.resample(self.finalFreq).mean()
+            df = df.interpolate(method='polynomial', order=3)
             
         return df
     
@@ -101,12 +100,12 @@ class loadHelper:
             return df
         
         # for everythin else, polinomial interpolation
-        df.loc[df.index[-1],:] = df.loc[df.index[0],:] 
-        df = df.bfill()
-        # kw = dict(method='polynomial', order=3, fill_value="extrapolate", limit_direction="both")
-        # df = df.interpolate(**kw)
+        # df.loc[df.index[-1],:] = df.loc[df.index[0],:] 
+        # df = df.bfill()
+        kw = dict(method='polynomial', order=3, fill_value="extrapolate", limit_direction="both")
+        df = df.interpolate(**kw)
 
-        return df / extend
+        return df
 
         
     def __extrapolateDataframe(self, df):
@@ -133,13 +132,13 @@ class loadHelper:
         )
     
         # Expected usage
-        df.loc[df.index[-1],:] = df.loc[df.index[0],:] 
+        # df.loc[df.index[-1],:] = df.loc[df.index[0],:] 
         # df = df.resample(self.finalFreq).bfill()
         
         # df = df * mat
         
-        # kw = dict(method='polynomial', order=3, fill_value="extrapolate", limit_direction="both")
-        # df = df.interpolate(**kw)
+        kw = dict(method='polynomial', order=3, fill_value="extrapolate", limit_direction="both")
+        df = df.interpolate(**kw)
         
         return df
     
@@ -156,5 +155,3 @@ class loadHelper:
         # create a stack
         stack = np.stack([self.__dirichletVector(extend) for x in range(len(df.columns))], axis=1) 
         return stack
-
-        
