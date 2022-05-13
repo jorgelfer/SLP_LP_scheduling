@@ -107,7 +107,7 @@ def getInitDemand(scriptPath, dss, freq):
     realDemand = load_hourlyDemand(scriptPath, len(loadNames), freq)
     realDemand = realDemand.T
     realDemand = realDemand[:len(loadNames)]
-    realDemand = 10*realDemand
+    realDemand = 9*realDemand
     dfDemand.loc[loadNames.index,:] = realDemand.values
 
     #Reactive Power df
@@ -119,6 +119,5 @@ def getInitDemand(scriptPath, dss, freq):
     #dfDemandQ = pd.DataFrame(demandQrofile) 
     #dfDemandQ.index = loadKvars.index 
     #dfDemandQ.columns = genBeta.index.strftime('%H:%M')
-    
 
     return loadNames, dfDemand, dfDemandQ

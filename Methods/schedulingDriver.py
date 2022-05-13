@@ -257,7 +257,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     PTDF = PTDF.round()
     
     # Line costs
-    pijCost = np.zeros((l,pointsInTime))
+    pijCost = 0.01*np.ones((l,pointsInTime))
     clin = np.reshape(pijCost.T, (1,pijCost.size), order="F")
     
     ## Generation settings
@@ -276,7 +276,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     
     #Demand Response (cost of shedding load)
     np.random.seed(2022) # Set random seed so results are repeatable
-    DRcost = np.random.randint(60,200,size=(1,n)) 
+    DRcost = np.random.randint(50,100,size=(1,n)) 
     cdr = np.kron(DRcost, np.ones((1,pointsInTime))) 
     
     #PV system

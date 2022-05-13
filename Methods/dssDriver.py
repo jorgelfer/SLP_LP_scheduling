@@ -57,8 +57,9 @@ def get_nodePowers(dss, nodeNames):
             Q = dss.cktelement_powers()[1::2]
             
             for n, node in enumerate(nodes):
-                nodeP[bus + f".{node}"] = -1*P[n]
-                nodeQ[bus + f".{node}"] = -1*Q[n]
+                nodeP[bus + f".{node}"] = abs(P[n])
+                nodeQ[bus + f".{node}"] = abs(Q[n])
+                
     # powers as array:
     Pa = np.array([nodeP[node] for node in nodeNames])
     Qa = np.array([nodeQ[node] for node in nodeNames])
@@ -133,8 +134,8 @@ def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, d
     
     
     dfV = pd.DataFrame(v, index=np.asarray(nodeNames), columns=dfDemand.columns)
-    dfP = pd.DataFrame(p - dfDemand.values, np.asarray(nodeNames), columns=dfDemand.columns)
-    dfQ = pd.DataFrame(q - dfDemandQ.values, np.asarray(nodeNames), columns=dfDemand.columns)
+    dfP = pd.DataFrame(p, np.asarray(nodeNames), columns=dfDemand.columns)
+    dfQ = pd.DataFrame(q, np.asarray(nodeNames), columns=dfDemand.columns)
     dfPjks = pd.DataFrame(pjk, index=np.asarray(nodeLineNames), columns=dfDemand.columns)
 
     if plot:

@@ -40,7 +40,7 @@ def order_dates(array, freq="30min"):
     return pdSeries
 
 ext = '.png'
-dispatch = 'LP'
+dispatch = 'SLP'
 plot = True
 
 script_path = os.path.dirname(os.path.abspath(__file__))
@@ -61,8 +61,8 @@ output_dir13 = pathlib.Path(output_dir12).joinpath(dispatch)
 if not os.path.isdir(output_dir13):
     os.mkdir(output_dir13)
 
-batSizes = [0, 100, 500, 900]
-pvSizes = [0, 100, 500, 900]
+batSizes = [0, 100, 200, 300]
+pvSizes = [0, 50, 100, 150]
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
@@ -74,7 +74,7 @@ for ba, batSize in enumerate(batSizes):
         ####################################
         # First thing: compute the initial Dispatch
         ####################################
-        demandProfile, LMP, OperationCost, mOperationCost, outES = SLP_LP_scheduling(batSize, pvSize, output_dir1, userDemand=None, plot=plot, freq="30min", dispatchType=dispatch)
+        demandProfile, LMP, OperationCost, mOperationCost, outES = SLP_LP_scheduling(batSize, pvSize, output_dir1, userDemand=None, plot=plot, freq="30", dispatchType=dispatch)
         
         # compute total demand
         totalDemand =  demandProfile.sum(axis = 0).to_frame()

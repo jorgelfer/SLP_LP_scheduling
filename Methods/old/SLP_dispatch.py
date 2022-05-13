@@ -34,8 +34,9 @@ class SLP_dispatch:
         self.clin = clin                 #"cost of lines"
         self.cdr = cdr                   # cost of demand response
         self.v_base = v_base             #Base voltage of the system in volts
-        self.storage = storage 
         self.DR = True
+
+        self.storage = storage 
 
         # correct the voltage sensitivity by the penalty factor
         dvdp_pf = self.ipf.values.T * dvdp.values 
@@ -115,8 +116,8 @@ class SLP_dispatch:
 
         # define limits 
         v_base = np.reshape(self.v_base.values.T, (1, np.size(self.v_base.values)), order="F")
-        v_lb = -(950 * v_base)
-        v_ub = (1050 * v_base)
+        v_lb = -(960 * v_base)
+        v_ub = (1040 * v_base)
 
         # compute matrices 
         A_v, b_v = self.__buildSensitivityInequality(self.dvdp, v_0, v_lb, v_ub)
@@ -407,12 +408,14 @@ class SLP_dispatch:
     def __linprog(self, f, Aeq, beq, A, b, lb, ub):
         """compute LP optmization using gurobi"""
         with gp.Env(empty=True) as env:
+            env.setParam('LogToConsole', 0)
             env.setParam('OutputFlag', 0)
             env.start()
             with gp.Model(env=env) as m:
 
                 # create a new model
                 m = gp.Model("LP1")
+                # m.Params.OutputFlag = 0
                 
                 # create variables
                 x = m.addMVar(shape=Aeq.get_shape()[1], lb=lb, ub=ub, vtype=GRB.CONTINUOUS, name="x")
