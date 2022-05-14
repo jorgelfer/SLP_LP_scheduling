@@ -196,7 +196,6 @@ def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
     
     # extract violating Lines
     Lmax = pd.DataFrame(Lmax, Pij.index, Pij.columns)
-    np.any(Pij > Lmax)
     compare = Pij > Lmax
     violatingLines = compare.any(axis=1)
     
@@ -206,10 +205,21 @@ def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
 
     return violatingLines, Lmax, Linfo
 
+def compute_violatingVolts(v_0, v_base, vmin=0.962, vmax=1.029):
+
+    # extract violating Lines
+    v_lb = (vmin*1000)*v_base 
+    v_ub = (vmax*1000)*v_base
+
+    compare = (v_0 > v_ub) | (v_0 < v_lb) 
+    violatingVolts = compare.any(axis=1)
+    
+    return violatingVolts
+
 # define the type of analysis;
 
     
-def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, PF=True, voltage=True, DR=True, plot=False):
+def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin=0.95, vmax=1.05, PF=True, voltage=True, DR=True, plot=False):
     
     # define Storage and PV
     if batSize == 0:
@@ -240,7 +250,9 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     v_basei = v_base.to_frame()
     v_base = np.kron(v_basei, np.ones((1,pointsInTime)))
     v_base = pd.DataFrame(v_base, index=v_basei.index, columns=v_0.columns)
-    
+
+    violatingVolts = compute_violatingVolts(v_0, v_base, vmin, vmax)
+
     # load PTDF results
     PTDF = load_PTDF(script_path, case)
     n = len(PTDF.columns)
@@ -276,7 +288,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     
     #Demand Response (cost of shedding load)
     np.random.seed(2022) # Set random seed so results are repeatable
-    DRcost = np.random.randint(50,100,size=(1,n)) 
+    DRcost = np.random.randint(40,300,size=(1,n)) 
     cdr = np.kron(DRcost, np.ones((1,pointsInTime))) 
     
     #PV system
@@ -303,14 +315,14 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     # call the OPF method
     if dispatchType == 'SLP':
         # create an instance of the dispatch class
-        dispatch_obj = SLP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage)
-        x, m, LMP = dispatch_obj.PTDF_SLP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0, violatingLines)
+        dispatch_obj = SLP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
+        x, m, LMP = dispatch_obj.PTDF_SLP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0)
     else:
-        dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage)
-        x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0, violatingLines)
+        dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
+        x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0)
     
     #Create plot object
-    plot_obj = plottingDispatch(output_dir, iterName, pointsInTime, script_path, PTDF=PTDF, dispatchType=dispatchType)
+    plot_obj = plottingDispatch(output_dir, iterName, pointsInTime, script_path, vmin, vmin, PTDF=PTDF, dispatchType=dispatchType)
     
     # extract dispatch results
     Pg, Pdr, Pij, Pchar, Pdis, E = plot_obj.extractResults(x=x, DR=DR, Storage=storage, batt=batt)
@@ -345,9 +357,9 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
         # ploting LMPs
         plot_obj.plot_LMP(outLMP, 'gen')
         
-        if LMP_Pdr is not None:
-            LMP_Pdr = pd.DataFrame(LMP_Pdr, PTDF.columns, v_0.columns)
-            plot_obj.plot_LMP(LMP_Pdr,'DR')
+        # if LMP_Pdr is not None:
+        #     LMP_Pdr = pd.DataFrame(LMP_Pdr, PTDF.columns, v_0.columns)
+        #     plot_obj.plot_LMP(LMP_Pdr,'DR')
         
         # if LMP_Pchar is not None:
         #     LMP_Pchar = pd.DataFrame(LMP_Pchar, PTDF.columns[Snodes], v_0.columns)

@@ -13,7 +13,7 @@ from scipy import sparse
 
 class SLP_dispatch:
 
-    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage):
+    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax):
         # constructor
         ###########
         
@@ -34,6 +34,8 @@ class SLP_dispatch:
         self.clin = clin                 #"cost of lines"
         self.cdr = cdr                   # cost of demand response
         self.v_base = v_base             #Base voltage of the system in volts
+        self.vmin = vmin * 1000             # voltage mi
+        self.vmax = vmax * 1000             # voltage max
         self.storage = storage 
         self.DR = True
 
@@ -53,7 +55,7 @@ class SLP_dispatch:
         self.ccapacity    = batt['ccapacity']
 
     # Methods
-    def PTDF_SLP_OPF(self, demandProfile, Pjk_0, v_0, Pg_0, PDR_0, violatingLines):
+    def PTDF_SLP_OPF(self, demandProfile, Pjk_0, v_0, Pg_0, PDR_0):
 
         # define number of points
         self.pointsInTime = np.size(demandProfile, 1)
@@ -62,7 +64,7 @@ class SLP_dispatch:
         Aeq, beq = self.__buildEquality(demandProfile)
         
         # build inequality constraints matrices
-        A, b = self.__buildInequality(Pjk_0, v_0, Pg_0, PDR_0, violatingLines)
+        A, b = self.__buildInequality(Pjk_0, v_0, Pg_0, PDR_0)
 
         # build cost function and bounds
         ub, lb, f = self.__buildCostAndBounds(demandProfile)
@@ -103,7 +105,7 @@ class SLP_dispatch:
 
         return ub, lb, f 
 
-    def __buildInequality(self, Pjk_0, v_0, Pg_0, PDR_0, violatingLines):
+    def __buildInequality(self, Pjk_0, v_0, Pg_0, PDR_0):
         """Build inequality constraints"""
         
         # initial power 
@@ -112,38 +114,27 @@ class SLP_dispatch:
         self.PDR_0 = np.reshape(PDR_0.values.T, (1,np.size(PDR_0)), order="F")
         
         #### for voltage ###
-
         # define limits 
         v_base = np.reshape(self.v_base.values.T, (1, np.size(self.v_base.values)), order="F")
-        v_lb = -(950 * v_base)
-        v_ub = (1050 * v_base)
+        v_lb = -(self.vmin * v_base)
+        v_ub = (self.vmax * v_base)
 
         # compute matrices 
         A_v, b_v = self.__buildSensitivityInequality(self.dvdp, v_0, v_lb, v_ub)
 
-        #### for flows   ###
-        if violatingLines.any():
-            # define limits 
-            # restrict only violating lines
-            Pjk_lim = self.Pjk_lim.loc[violatingLines,:]
-            Pjk_lim = np.reshape(Pjk_lim.values.T, (1,np.size(Pjk_lim.values)), order="F") 
-            Pjk_lb = Pjk_lim
-            Pjk_ub = Pjk_lim
-
-            # compute matrices 
-            A_flows, b_flows = self.__buildSensitivityInequality(self.PTDF.loc[violatingLines,:], Pjk_0.loc[violatingLines,:], Pjk_lb, Pjk_ub) # restrict only violating lines
-
-
-            # concatenate both contributions
-            A = sparse.vstack( (A_flows, A_v) )
-            b = np.concatenate((b_flows, b_v), axis=0)
-        else:
-            A = A_v
-            b = b_v
+        ##### for flows ###
+        # define limits 
+        Pjk_lim = np.reshape(self.Pjk_lim.values.T, (1,np.size(self.Pjk_lim.values)), order="F") 
+        Pjk_lb = Pjk_lim
+        Pjk_ub = Pjk_lim
         
-        # variables needed in other methods
-        self.violatingLines = violatingLines
-
+        # compute matrices 
+        A_flows, b_flows = self.__buildSensitivityInequality(self.PTDF, Pjk_0, Pjk_lb, Pjk_ub) # restrict only violating lines: this will be done automatically by gurobi
+        
+        # concatenate both contributions
+        A = sparse.vstack( (A_flows, A_v) )
+        b = np.concatenate((b_flows, b_v), axis=0)
+        
         return A, b 
 
     def __buildSensitivityInequality(self, dxdp, x_0, x_lb, x_ub):
@@ -308,14 +299,11 @@ class SLP_dispatch:
         # for the voltage
         A2_v = self.__storageSensitivityA(row, self.dvdp)
                 
-        if self.violatingLines.any():
-            # for the flows
-            A2_flows = self.__storageSensitivityA(row, self.PTDF.loc[self.violatingLines])
+        # for the flows
+        A2_flows = self.__storageSensitivityA(row, self.PTDF)
 
-            # contatenate both contributions
-            A2 = sparse.vstack( (A2_flows, A2_v) )
-        else:
-            A2 = A2_v
+        # contatenate both contributions
+        A2 = sparse.vstack( (A2_flows, A2_v) )
 
         # finally concatenate with the original matrix
         Ain = sparse.hstack( (A1,A2) )
@@ -413,6 +401,7 @@ class SLP_dispatch:
 
                 # create a new model
                 m = gp.Model("LP1")
+                m.Params.OutputFlag = 0
                 
                 # create variables
                 x = m.addMVar(shape=Aeq.get_shape()[1], lb=lb, ub=ub, vtype=GRB.CONTINUOUS, name="x")

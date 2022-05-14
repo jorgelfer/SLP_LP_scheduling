@@ -13,7 +13,7 @@ ext = '.png'
 
 class plottingDispatch:
 
-    def __init__(self, output_dir,  niter, PointsInTime, script_path, PTDF=None, Ain=None, xp=None, title=True, dispatchType='LP'):
+    def __init__(self, output_dir,  niter, PointsInTime, script_path, vmin, vmax, PTDF=None, Ain=None, title=True, dispatchType='LP'):
         
         if Ain is not None:
             self.Ain = Ain
@@ -34,6 +34,8 @@ class plottingDispatch:
         self.niter = niter 
         
         self.PointsInTime = PointsInTime
+        self.vmin = vmin
+        self.vmax = vmax
 
         # time stamp 
         t = time.localtime()
@@ -60,10 +62,10 @@ class plottingDispatch:
             v = initVolts
         
         # compute the per unit value of the voltage
-        vpu = v[indexDemand.values] / (1000*vBase[indexDemand.values])
+        vpu = v / (1000*vBase)
         
         # create a dataframe for limits
-        limits = np.concatenate([0.96*np.ones((1, self.PointsInTime)), 1.04*np.ones((1, self.PointsInTime))], axis = 0)
+        limits = np.concatenate([self.vmin*np.ones((1, self.PointsInTime)), self.vmax*np.ones((1, self.PointsInTime))], axis = 0)
         dfLimits = pd.DataFrame(limits, index = ['lower limit', 'upper limit'], columns = vpu.columns)
         
         plt.clf()
@@ -321,7 +323,7 @@ class plottingDispatch:
 
         return LMP_Pg, LMP_Pdr, LMP_Pij, LMP_Pchar, LMP_Pdis, LMP_E
 
-    def extractResults(self, x, DR, Storage, batt, xp=None):
+    def extractResults(self, x, DR, Storage, batt):
         
         n = self.n
         m = self.l 

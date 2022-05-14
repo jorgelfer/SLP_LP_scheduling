@@ -13,7 +13,7 @@ from scipy import sparse
 
 class LP_dispatch:
 
-    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage):
+    def __init__(self, pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax):
         # constructor
         ###########
         
@@ -34,9 +34,10 @@ class LP_dispatch:
         self.clin = clin                 #"cost of lines"
         self.cdr = cdr                   # cost of demand response
         self.v_base = v_base             #Base voltage of the system in volts
-        self.DR = True
-
+        self.vmin = vmin * 1000             # voltage mi
+        self.vmax = vmax * 1000             # voltage max
         self.storage = storage 
+        self.DR = True
 
         # correct the voltage sensitivity by the penalty factor
         self.dvdp = dvdp
@@ -55,7 +56,7 @@ class LP_dispatch:
         self.ccapacity    = batt['ccapacity']
 
     # Methods
-    def PTDF_LP_OPF(self, demandProfile,Pjk_0, v_0, Pg_0, PDR_0, violatingLines):
+    def PTDF_LP_OPF(self, demandProfile,Pjk_0, v_0, Pg_0, PDR_0):
 
         # define number of points
         self.pointsInTime = np.size(demandProfile, 1)
@@ -136,8 +137,8 @@ class LP_dispatch:
 
         # define limits 
         v_base = np.reshape(self.v_base.values.T, (1, np.size(self.v_base.values)), order="F")
-        v_lb = -(960 * v_base)
-        v_ub = (1040 * v_base)
+        v_lb = -(vmin * v_base)
+        v_ub = (vmax * v_base)
 
         # compute matrices 
         A, b = self.__buildSensitivityInequality(self.dvdp_pf, v_0, v_lb, v_ub)

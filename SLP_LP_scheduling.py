@@ -41,7 +41,7 @@ def save_ES(script_path, outGen, outDR, outPsc, outPsd):
     outES['Pdis'] = outPsd
     return outES
 
-def SLP_LP_scheduling(batSize, pvSize, output_dir, userDemand=None, plot=False, freq="15min", dispatchType='SLP', outES=None):
+def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemand=None, plot=False, freq="15min", dispatchType='SLP'):
 
     # execute the DSS model
     script_path = os.path.dirname(os.path.abspath(__file__))
@@ -66,7 +66,7 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, userDemand=None, plot=False, 
         dfDemand.loc[loadNames.index,:] = userDemand
         
     #Dss driver function
-    Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, out=outES, plot=plot)
+    Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, plot=plot)
     outDSS = save_initDSS(script_path, Pg_0, v_0, Pjk_0, v_base, loadNames, dfDemand, dfDemandQ)
 
     # # reactive power correction
@@ -74,7 +74,7 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, userDemand=None, plot=False, 
     # Pjk_lim = Q_obj.compute_correction(v_0, v_base, Pjk_0.index)
     
     #Energy scheduling driver function   
-    outGen, outDR, outPchar, outPdis, outLMP, costPdr, cgn, mobj = schedulingDriver(batSize, pvSize, output_dir, 'Dispatch', freq, script_path, case, outDSS, dispatchType, plot=plot)
+    outGen, outDR, outPchar, outPdis, outLMP, costPdr, cgn, mobj = schedulingDriver(batSize, pvSize, output_dir, 'Dispatch', freq, script_path, case, outDSS, dispatchType, vmin, vmax, plot=plot)
     outES = save_ES(script_path, outGen, outDR, outPchar, outPdis)
     
     # normalization 
@@ -82,7 +82,7 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, userDemand=None, plot=False, 
     dfDemand = outDSS['initDemand']
     
     #corrected dss driver function
-    Pg, v, Pjk, v_base = dssDriver(output_dir, 'DispatchDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, out=outES, plot=plot)
+    Pg, v, Pjk, v_base = dssDriver(output_dir, 'FinalDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, out=outES, plot=True)
 
     # initial power 
     Pg = np.reshape(Pg.values.T, np.size(Pg), order="F")
@@ -90,7 +90,6 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, userDemand=None, plot=False, 
 
     operationCost = costPdr[0] + costPg[0]
         
-    return dfDemand.loc[loadNames.index,:], outLMP, operationCost, mobj, outES
+    return dfDemand.loc[loadNames.index,:], outLMP, operationCost, mobj
         
-# demandProfile, LMP = LP_scheduling(userDemand=None, plot=True)           
         

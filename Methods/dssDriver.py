@@ -67,7 +67,7 @@ def get_nodePowers(dss, nodeNames):
     return Pa, Qa
 
 #driver function:
-def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, dfDemand, dfDemandQ, dispatchType, out=None, plot=True):
+def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, dfDemand, dfDemandQ, dispatchType, vmin=0.95, vmax=1.05, out=None, plot=True):
 
     dss.text(f"Compile [{dssFile}]") 
     set_baseline(dss)
@@ -140,7 +140,7 @@ def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, d
 
     if plot:
         #plot results
-        plot_obj = plottingDispatch(output_dir, iterName, PointsInTime=pointsInTime, script_path=scriptPath, dispatchType=dispatchType)
+        plot_obj = plottingDispatch(output_dir, iterName, pointsInTime, scriptPath, vmin, vmax, dispatchType=dispatchType)
         
         #plot Line Limits\
         Lmax, Linfo = load_lineLimits(scriptPath, case, PointsInTime=pointsInTime) 

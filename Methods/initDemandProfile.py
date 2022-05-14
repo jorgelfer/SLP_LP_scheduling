@@ -107,7 +107,7 @@ def getInitDemand(scriptPath, dss, freq):
     realDemand = load_hourlyDemand(scriptPath, len(loadNames), freq)
     realDemand = realDemand.T
     realDemand = realDemand[:len(loadNames)]
-    realDemand = 9*realDemand
+    realDemand = 8.5*realDemand
     dfDemand.loc[loadNames.index,:] = realDemand.values
 
     #Reactive Power df

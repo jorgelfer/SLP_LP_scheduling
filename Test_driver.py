@@ -41,7 +41,7 @@ def order_dates(array, freq="30min"):
 
 ext = '.png'
 dispatch = 'SLP'
-plot = True
+plot = False
 
 script_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -61,20 +61,24 @@ output_dir13 = pathlib.Path(output_dir12).joinpath(dispatch)
 if not os.path.isdir(output_dir13):
     os.mkdir(output_dir13)
 
-batSizes = [0, 100, 200, 300]
-pvSizes = [0, 50, 100, 150]
+batSizes = [0, 100, 300]
+pvSizes = [0, 50, 100]
+
+# voltage limits
+vmin = 0.958
+vmax = 1.032
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
         
-        output_dir1 = pathlib.Path(output_dir13).joinpath(f"bat_{ba}_pv{pv}")
+        output_dir1 = pathlib.Path(output_dir13).joinpath(f"bat_{ba}_pv_{pv}")
         if not os.path.isdir(output_dir1):
             os.mkdir(output_dir1)
             
         ####################################
         # First thing: compute the initial Dispatch
         ####################################
-        demandProfile, LMP, OperationCost, mOperationCost, outES = SLP_LP_scheduling(batSize, pvSize, output_dir1, userDemand=None, plot=plot, freq="30", dispatchType=dispatch)
+        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemand=None, plot=plot, freq="30min", dispatchType=dispatch)
         
         # compute total demand
         totalDemand =  demandProfile.sum(axis = 0).to_frame()
@@ -92,6 +96,8 @@ for ba, batSize in enumerate(batSizes):
         departureTime_list = [f"{np.random.randint(6, 12)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
         # create weights using dirichlet distribution: the sumation add up to 1
         initW = [np.random.dirichlet(np.ones(4),size=1) for i in range(LMP_size)]
+        # LMP index random
+        LMP_index = LMP.sample(frac = 1, random_state=np.random.RandomState(2022)).index
         
         output_dir = pathlib.Path(output_dir1).joinpath("SmartCharging")
         
@@ -103,22 +109,12 @@ for ba, batSize in enumerate(batSizes):
         ####################################
         
         # define number of iterations
-        iterations = 4
-        evh = [10, 40, 70, -1]
-        LMP_size = len(evh)
-        
-        # create a convergence variable to store results
-        dLMP_F = np.zeros((LMP_size, iterations))
-        dLMP_N = np.zeros((LMP_size, iterations))
-        dLMP_L1 = np.zeros((LMP_size, iterations))
-        dLMP_L2 = np.zeros((LMP_size, iterations))
-        dLMP_Linf = np.zeros((LMP_size, iterations))
-        
-        OpCost = np.zeros((LMP_size, iterations))
-        mOpCost = np.zeros((LMP_size, iterations))
+        iterations = 10 
+        evh = [60, 70, -1]
+        evh_size = len(evh)
         
         # number of EV loop
-        for ev in range(LMP_size): 
+        for ev in range(evh_size): 
             # initialize store variables as lists
             LMP_list = list()
             OpCost_list = list()
@@ -134,12 +130,21 @@ for ba, batSize in enumerate(batSizes):
             
             if not os.path.isdir(output_dirEV):
                 os.mkdir(output_dirEV)
+                
+            # per node LMP comparison
+            dLMP_node_L2 = np.zeros((len(LMP.index), iterations))
+            dLMP_node_L1 = np.zeros((len(LMP.index), iterations))
+            dLMP_node_Linf = np.zeros((len(LMP.index), iterations))
+
+            # store operating cost
+            OpCost = np.zeros(iterations)
+            mOpCost = np.zeros(iterations)
         
             # iterations loop
             for it in range(iterations): 
                 
                 # keep track
-                print(f"{ev}-{it}")
+                print(f"bat:{ba}_pv:{pv}_EV:{ev}_it:{it}")
         
                 # smart charging module
                 EV_demandProfile = np.zeros(demandProfile.shape)
@@ -148,7 +153,8 @@ for ba, batSize in enumerate(batSizes):
                 # create smart charging object
                 charging_obj = SmartCharging(numberOfHours=24, pointsInTime=LMP.shape[1]) 
                 
-                for i, ind in enumerate(LMP.index[:evh[ev]]):
+                
+                for i, ind in enumerate(LMP_index[:evh[ev]]):
                     #individual LMP (pi)
                     pi = LMP_list[-1].loc[ind,:]
                     # reorder dates
@@ -197,118 +203,96 @@ for ba, batSize in enumerate(batSizes):
                     plt.close('all')
                 
                 # compute scheduling
-                _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC, _ = SLP_LP_scheduling(batSize, pvSize, output_dirEV, userDemand=newDemand, plot=True, freq="30min", dispatchType=dispatch, outES=outES)
+                _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC, _ = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=True, freq="30min", dispatchType=dispatch)
         
                 # store corrected values 
                 LMP_list.append(LMP_EVC)
                 OpCost_list.append(OperationCost_EVC) 
                 mOpCost_list.append(mOperationCost_EVC) 
                 
-                # store difference
-                dLMP_F[ev, it] = np.linalg.norm(LMP_list[it]-LMP_list[it+1], 'fro')
-                dLMP_N[ev, it] = np.linalg.norm(LMP_list[it]-LMP_list[it+1], 'nuc')
-                dLMP_L1[ev, it] = np.linalg.norm(LMP_list[it]-LMP_list[it+1], 1)
-                dLMP_L2[ev, it] = np.linalg.norm(LMP_list[it]-LMP_list[it+1], 2)
-                dLMP_Linf[ev, it] = np.linalg.norm(LMP_list[it]-LMP_list[it+1], np.inf)
-        
                 # store operation cost difference
-                OpCost[ev, it] = abs(OpCost_list[it] - OpCost_list[it+1])
+                OpCost[it] = abs(OpCost_list[it] - OpCost_list[it+1])
                 
                 # store operation cost
-                mOpCost[ev, it] = abs(mOpCost_list[it] - mOpCost_list[it+1])
+                mOpCost[it] = abs(mOpCost_list[it] - mOpCost_list[it+1])
+
+                # store node-base LMP difference
+                dLMP_node_L2[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=2, axis=1)
+                dLMP_node_L1[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=1, axis=1)
+                dLMP_node_Linf[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=np.inf, axis=1)
+
+            ##########
+            # node base LMP difference (L2)
+            pd_dLMP = pd.DataFrame(dLMP_node_L2)
+            dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_L2.pkl")
+            pd_dLMP.to_pickle(dLMP_file)
+            # plot
+            plt.clf()
+            fig, ax = plt.subplots()
+            sns.heatmap(pd_dLMP, annot=False)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dirEV).joinpath("dLMP_node_L2"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
+            
+            # node base LMP difference
+            pd_dLMP = pd.DataFrame(dLMP_node_L1)
+            dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_L1.pkl")
+            pd_dLMP.to_pickle(dLMP_file)
+            # plot
+            plt.clf()
+            fig, ax = plt.subplots()
+            sns.heatmap(pd_dLMP, annot=False)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dirEV).joinpath("dLMP_node_L1"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
+            
+            # node base LMP difference (Linf)
+            pd_dLMP = pd.DataFrame(dLMP_node_Linf)
+            dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_Linf.pkl")
+            pd_dLMP.to_pickle(dLMP_file)
+            # plot
+            plt.clf()
+            fig, ax = plt.subplots()
+            sns.heatmap(pd_dLMP, annot=False)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dirEV).joinpath("dLMP_node_Linf"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
         
-        ###############
-        # save matrices
-        # F norm
-        pd_dLMP = pd.DataFrame(dLMP_F)
-        dLMP_file = pathlib.Path(output_dir).joinpath("dLMP_F.pkl")
-        pd_dLMP.to_pickle(dLMP_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        sns.heatmap(pd_dLMP, annot=False)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("dLMP_F"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
-        
-        # N norm
-        pd_dLMP = pd.DataFrame(dLMP_N)
-        dLMP_file = pathlib.Path(output_dir).joinpath("dLMP_N.pkl")
-        pd_dLMP.to_pickle(dLMP_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        sns.heatmap(pd_dLMP, annot=False)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("dLMP_N"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
-        
-        # L1 norm
-        pd_dLMP = pd.DataFrame(dLMP_L1)
-        dLMP_file = pathlib.Path(output_dir).joinpath("dLMP_L1.pkl")
-        pd_dLMP.to_pickle(dLMP_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        sns.heatmap(pd_dLMP, annot=False)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("dLMP_L1"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
-        
-        # L2 norm
-        pd_dLMP = pd.DataFrame(dLMP_L2)
-        dLMP_file = pathlib.Path(output_dir).joinpath("dLMP_L2.pkl")
-        pd_dLMP.to_pickle(dLMP_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        sns.heatmap(pd_dLMP, annot=False)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("dLMP_L2"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
-        
-        # Linf norm
-        pd_dLMP = pd.DataFrame(dLMP_Linf)
-        dLMP_file = pathlib.Path(output_dir).joinpath("dLMP_Linf.pkl")
-        pd_dLMP.to_pickle(dLMP_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        sns.heatmap(pd_dLMP, annot=False)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("dLMP_Linf"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
-        
-        ########################
-        ### costs
-        pd_OpCost = pd.DataFrame(OpCost)
-        OpCost_file = pathlib.Path(output_dir).joinpath("OpCos.pkl")
-        pd_OpCost.to_pickle(OpCost_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        pd_cost = pd.DataFrame(OpCost)
-        sns.heatmap(pd_cost, annot=False)#, vmin=2e6, vmax=2.30e6)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("Operation_cost"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
-        
-        ##############
-        pd_mOpCost = pd.DataFrame(mOpCost)
-        mOpCost_file = pathlib.Path(output_dir).joinpath("mOpCost.pkl")
-        pd_mOpCost.to_pickle(mOpCost_file)
-        # plot
-        plt.clf()
-        fig, ax = plt.subplots()
-        pd_mcost = pd.DataFrame(mOpCost)
-        sns.heatmap(pd_mcost, annot=False)#, vmin=2e6, vmax=2.30e6)
-        fig.tight_layout()
-        output_img = pathlib.Path(output_dir).joinpath("mOperation_cost"+ ext)
-        plt.savefig(output_img)
-        plt.close('all')
+            ########################
+            ### costs
+            plt.clf()
+            fig, ax = plt.subplots()
+            plt.stem(OpCost_list)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dir).joinpath("Operation_cost_list"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
+
+            plt.clf()
+            fig, ax = plt.subplots()
+            plt.stem(OpCost)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dir).joinpath("Operation_cost"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
+            
+            ########################
+            ###  mcosts
+            plt.clf()
+            fig, ax = plt.subplots()
+            plt.stem(mOpCost_list)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dir).joinpath("mOperation_cost_list"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
+
+            plt.clf()
+            fig, ax = plt.subplots()
+            plt.stem(OpCost)
+            fig.tight_layout()
+            output_img = pathlib.Path(output_dir).joinpath("mOperation_cost"+ ext)
+            plt.savefig(output_img)
+            plt.close('all')
