@@ -65,8 +65,8 @@ batSizes = [0, 100, 300]
 pvSizes = [0, 50, 100]
 
 # voltage limits
-vmin = 0.958
-vmax = 1.032
+vmin = 0.960
+vmax = 1.030
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
@@ -136,10 +136,6 @@ for ba, batSize in enumerate(batSizes):
             dLMP_node_L1 = np.zeros((len(LMP.index), iterations))
             dLMP_node_Linf = np.zeros((len(LMP.index), iterations))
 
-            # store operating cost
-            OpCost = np.zeros(iterations)
-            mOpCost = np.zeros(iterations)
-        
             # iterations loop
             for it in range(iterations): 
                 
@@ -210,19 +206,13 @@ for ba, batSize in enumerate(batSizes):
                 OpCost_list.append(OperationCost_EVC) 
                 mOpCost_list.append(mOperationCost_EVC) 
                 
-                # store operation cost difference
-                OpCost[it] = abs(OpCost_list[it] - OpCost_list[it+1])
-                
-                # store operation cost
-                mOpCost[it] = abs(mOpCost_list[it] - mOpCost_list[it+1])
-
                 # store node-base LMP difference
                 dLMP_node_L2[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=2, axis=1)
                 dLMP_node_L1[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=1, axis=1)
                 dLMP_node_Linf[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=np.inf, axis=1)
 
             ##########
-            # node base LMP difference (L2)
+            # node based LMP difference (L2)
             pd_dLMP = pd.DataFrame(dLMP_node_L2)
             dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_L2.pkl")
             pd_dLMP.to_pickle(dLMP_file)
@@ -265,34 +255,38 @@ for ba, batSize in enumerate(batSizes):
             ### costs
             plt.clf()
             fig, ax = plt.subplots()
-            plt.stem(OpCost_list)
+            plt.ylim(bottom=min(OpCost_list))
+            plt.stem(OpCost_list - min(OpCost_list))
             fig.tight_layout()
-            output_img = pathlib.Path(output_dir).joinpath("Operation_cost_list"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath("Operation_cost_list"+ ext)
             plt.savefig(output_img)
             plt.close('all')
 
             plt.clf()
             fig, ax = plt.subplots()
-            plt.stem(OpCost)
+            plt.ylim(bottom=min(OpCost_list[1:]))
+            plt.stem(OpCost_list[1:] - min(OpCost_list[1:]))
             fig.tight_layout()
-            output_img = pathlib.Path(output_dir).joinpath("Operation_cost"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath("Operation_cost_list_1"+ ext)
             plt.savefig(output_img)
             plt.close('all')
-            
+
             ########################
             ###  mcosts
             plt.clf()
             fig, ax = plt.subplots()
+            plt.ylim(bottom=min(mOpCost_list))
             plt.stem(mOpCost_list)
             fig.tight_layout()
-            output_img = pathlib.Path(output_dir).joinpath("mOperation_cost_list"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath("mOperation_cost_list"+ ext)
             plt.savefig(output_img)
             plt.close('all')
 
             plt.clf()
             fig, ax = plt.subplots()
-            plt.stem(OpCost)
+            plt.ylim(bottom=min(mOpCost_list[1:]))
+            plt.stem(mOpCost_list[1:] - min(mOpCost_list[1:]))
             fig.tight_layout()
-            output_img = pathlib.Path(output_dir).joinpath("mOperation_cost"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath("mOperation_cost_list_1"+ ext)
             plt.savefig(output_img)
             plt.close('all')

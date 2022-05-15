@@ -407,7 +407,6 @@ class LP_dispatch:
     def __linprog(self, f, Aeq, beq, A, b, lb, ub):
         """compute LP optmization using gurobi"""
         with gp.Env(empty=True) as env:
-            env.setParam('LogToConsole', 0)
             env.setParam('OutputFlag', 0)
             env.start()
             with gp.Model(env=env) as m:
