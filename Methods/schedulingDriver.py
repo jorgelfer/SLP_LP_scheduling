@@ -121,7 +121,7 @@ def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1b
         Gmax[np.where(np.any(PV1,axis=1))[0]] =  300        #% Utility scale Solar PV
     
     # define the cost
-    gCost[PVnodes] = 0.1*cost_wednesday
+    gCost[PVnodes] = 0.1*np.mean(cost_wednesday)
     
     # create load helper method
     help_obj = loadHelper(initfreq = 'H', finalFreq = freq)
@@ -354,8 +354,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
         if storage:
             plot_obj.plot_storage(E, batt, gCost[0,:])
         
-        # ploting LMPs
-        plot_obj.plot_LMP(outLMP, 'gen')
+        ## ploting LMPs
+        #plot_obj.plot_LMP(outLMP, 'gen')
         
         # if LMP_Pdr is not None:
         #     LMP_Pdr = pd.DataFrame(LMP_Pdr, PTDF.columns, v_0.columns)

@@ -137,8 +137,8 @@ class LP_dispatch:
 
         # define limits 
         v_base = np.reshape(self.v_base.values.T, (1, np.size(self.v_base.values)), order="F")
-        v_lb = -(vmin * v_base)
-        v_ub = (vmax * v_base)
+        v_lb = -(self.vmin * v_base)
+        v_ub = (self.vmax * v_base)
 
         # compute matrices 
         A, b = self.__buildSensitivityInequality(self.dvdp_pf, v_0, v_lb, v_ub)

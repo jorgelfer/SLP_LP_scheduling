@@ -82,10 +82,14 @@ class plottingDispatch:
                 
         fig.tight_layout()
 
-        output_img = pathlib.Path(self.output_dir).joinpath(f"voltage_{self.niter}_{self.timestamp}" + ext)
+        # create voltage directory to store results
+        output_dirV = pathlib.Path(self.output_dir).joinpath("voltage")
+        if no os.path.isdir(output_dirV):
+            os.mkdir(output_dirV)
+
+        output_img = pathlib.Path(output_dirV).joinpath(f"voltage_{self.niter}_{self.timestamp}" + ext)
         plt.savefig(output_img)
         plt.close('all')
-        
         
     def plot_PTDF(self):
 
@@ -133,7 +137,11 @@ class plottingDispatch:
                     plt.xlabel('Time (hrs)')
                     
                 fig.tight_layout()
-                output_img = pathlib.Path(self.output_dir).joinpath(f"Power_{na}_{self.niter}_{self.timestamp}" + ext)
+                # create flows directory to store results
+                output_dirPjk = pathlib.Path(self.output_dir).joinpath("Flows")
+                if no os.path.isdir(output_dirPjk):
+                    os.mkdir(output_dirPjk)
+                output_img = pathlib.Path(output_dirPjk).joinpath(f"Power_{na}_{self.niter}_{self.timestamp}" + ext)
                 plt.savefig(output_img)
                 
             cont += ni

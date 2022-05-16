@@ -7,7 +7,7 @@ Created on Mon Mar  7 17:07:32 2022
 """
 #########################################################################
 from SLP_LP_scheduling import SLP_LP_scheduling
-from Methods.SmartCharging import SmartCharging 
+from Methods.smartCharging_driver import smartCharging_driver 
 import pandas as pd
 import numpy as np
 import os
@@ -65,8 +65,8 @@ batSizes = [0, 100, 300]
 pvSizes = [0, 50, 100]
 
 # voltage limits
-vmin = 0.960
-vmax = 1.030
+vmin = 0.97
+vmax = 1.03
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
@@ -79,10 +79,7 @@ for ba, batSize in enumerate(batSizes):
         # First thing: compute the initial Dispatch
         ####################################
         demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemand=None, plot=plot, freq="30min", dispatchType=dispatch)
-        
-        # compute total demand
-        totalDemand =  demandProfile.sum(axis = 0).to_frame()
-        
+                
         # Set random seed so results are repeatable
         np.random.seed(2022) 
         # define init energy 
@@ -95,12 +92,15 @@ for ba, batSize in enumerate(batSizes):
         # define departure time
         departureTime_list = [f"{np.random.randint(6, 12)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
         # create weights using dirichlet distribution: the sumation add up to 1
-        initW = [np.random.dirichlet(np.ones(4),size=1) for i in range(LMP_size)]
+        initW_list = [np.random.dirichlet(np.ones(4),size=1) for i in range(LMP_size)]
         # LMP index random
-        LMP_index = LMP.sample(frac = 1, random_state=np.random.RandomState(2022)).index
+        LMP_index = np.random.choice(LMP_size, LMP_size, replace=False)
+
+        # create smart charging driver object
+        char_obj = smartCharging_driver(ext, arrivalTime_list, departureTime_list, initEnergy_list, evCapacity_list, initW_list) 
         
+        # define folder to store smartcharging results
         output_dir = pathlib.Path(output_dir1).joinpath("SmartCharging")
-        
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
             
@@ -116,7 +116,8 @@ for ba, batSize in enumerate(batSizes):
         # number of EV loop
         for ev in range(evh_size): 
             # initialize store variables as lists
-            LMP_list = list()
+            prevLMP = LMP.copy() 
+            prevDemand = demandProfile.copy()
             OpCost_list = list()
             mOpCost_list = list()
         
@@ -125,7 +126,7 @@ for ba, batSize in enumerate(batSizes):
             OpCost_list.append(OperationCost) 
             mOpCost_list.append(mOperationCost) 
         
-            # create a folder to store LMP
+            # create a folder to store LMP per EV
             output_dirEV = pathlib.Path(output_dir).joinpath(f"EV_{ev}")
             
             if not os.path.isdir(output_dirEV):
@@ -136,80 +137,49 @@ for ba, batSize in enumerate(batSizes):
             dLMP_node_L1 = np.zeros((len(LMP.index), iterations))
             dLMP_node_Linf = np.zeros((len(LMP.index), iterations))
 
+            # prelocate demand difference variable
+            diffDemand = np.zeros(demandProfile.shape)
+
             # iterations loop
             for it in range(iterations): 
                 
                 # keep track
                 print(f"bat:{ba}_pv:{pv}_EV:{ev}_it:{it}")
         
-                # smart charging module
-                EV_demandProfile = np.zeros(demandProfile.shape)
-                EV_demandProfile = pd.DataFrame(EV_demandProfile, index=LMP.index, columns=LMP.columns)
+                # compute EV corrected demand
+                newDemand = char_obj.charging_driver(output_dirEV, it, demandProfile, prevLMP, LMP_index, plot)
                 
-                # create smart charging object
-                charging_obj = SmartCharging(numberOfHours=24, pointsInTime=LMP.shape[1]) 
-                
-                
-                for i, ind in enumerate(LMP_index[:evh[ev]]):
-                    #individual LMP (pi)
-                    pi = LMP_list[-1].loc[ind,:]
-                    # reorder dates
-                    pi = reorder_dates(pi)
-                    # transform to array
-                    pi = np.expand_dims(pi.values, axis=1)
-                    # household demand profile
-                    PH = demandProfile.loc[ind,:] # normal demand
-                    # reorder dates
-                    PH = reorder_dates(PH)
-                    PH = np.expand_dims(PH.values, axis=1)
-                    # user defined weights
-                    w = np.squeeze(initW[i]) 
-                    #EV initial conditions
-                    arrTime = arrivalTime_list[i]
-                    depTime = departureTime_list[i]
-                    initEnergy = initEnergy_list[i]
-                    evCapacity = evCapacity_list[i] 
-        
-                    # optimal EV charging using the smart charging object
-                    PV_star,_,_,_ = charging_obj.QP_charging(pi, PH, w, arrTime, depTime, initEnergy, evCapacity) # user specific values
-                    # reorder index from dataSeries:
-                    PV_star = order_dates(PV_star, freq="30min")
-                    # assign to the profile
-                    EV_demandProfile.loc[ind,:] = PV_star
-                    
-                ####################################
-                # Third thing: compute dispatch with decentralized smart charging correction
-                ####################################
-                #define new demand
-                newDemand = demandProfile + EV_demandProfile
-        
-                if plot:
-                    # new demand plot
-                    plt.clf()
-                    fig, ax = plt.subplots()
-                    
-                    totalNewDemand = newDemand.sum(axis = 0).to_frame()
-                    concat3 = pd.concat([totalDemand, totalNewDemand], axis=1)
-                    concat3.plot()
-                    plt.legend(['load_toalDemand', 'load_EV_totalDemand'], prop={'size': 10})
-                        
-                    fig.tight_layout()
-                    output_img = pathlib.Path(output_dirEV).joinpath(f"EVcorrected_demand_{it}"+ ext)
-                    plt.savefig(output_img)
-                    plt.close('all')
-                
-                # compute scheduling
-                _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC, _ = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=True, freq="30min", dispatchType=dispatch)
+                # compute scheduling with new demand
+                _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=True, freq="30min", dispatchType=dispatch)
         
                 # store corrected values 
-                LMP_list.append(LMP_EVC)
                 OpCost_list.append(OperationCost_EVC) 
                 mOpCost_list.append(mOperationCost_EVC) 
                 
                 # store node-base LMP difference
-                dLMP_node_L2[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=2, axis=1)
-                dLMP_node_L1[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=1, axis=1)
-                dLMP_node_Linf[:,it] = np.linalg.norm(LMP_list[it+1]-LMP_list[it], ord=np.inf, axis=1)
+                dLMP_node_L2[:,it] = np.linalg.norm(LMP_EVC - prevDemand, ord=2, axis=1)
+                dLMP_node_L1[:,it] = np.linalg.norm(LMP_EVC - prevDemand, ord=1, axis=1)
+                dLMP_node_Linf[:,it] = np.linalg.norm(LMP_EVC - prevDemand, ord=np.inf, axis=1)
+
+                # Store demand difference
+                diffDemand = newDemand - prevDemand
+                if plot:
+                    diffDemand_pd = pd.DataFrame(diffDemand)
+                    fig, ax = plt.subplots()
+                    sns.heatmap(diffDemand, annot=False)
+                    fig.tight_layout()
+
+                    output_dirDemand = pathlib.Path(output_dirEV).joinpath("Demand")
+                    if not os.path.isdir(output_dirDemand):
+                        os.mkdir(output_dirDemand)
+
+                    output_img = pathlib.Path(output_dirDemand).joinpath(f"Demand_diff_it_{it}"+ ext)
+                    plt.savefig(output_img)
+                    plt.close('all')
+
+                # assign new definition
+                prevLMP = LMP_EVC.copy() 
+                prevDemand = newDemand.copy()
 
             ##########
             # node based LMP difference (L2)
