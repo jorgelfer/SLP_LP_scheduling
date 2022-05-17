@@ -82,7 +82,7 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemand=None, 
     dfDemand = outDSS['initDemand']
     
     #corrected dss driver function
-    Pg, v, Pjk, v_base = dssDriver(output_dir, 'FinalDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, out=outES, plot=True)
+    Pg, v, Pjk, v_base = dssDriver(output_dir, 'FinalDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, out=outES, plot=plot)
 
     # initial power 
     Pg = np.reshape(Pg.values.T, np.size(Pg), order="F")

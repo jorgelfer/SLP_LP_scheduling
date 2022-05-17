@@ -13,7 +13,7 @@ import numpy as np
 import os
 import pathlib
 import matplotlib.pyplot as plt
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 10})
 import time
 import seaborn as sns
 
@@ -41,7 +41,7 @@ def order_dates(array, freq="30min"):
 
 ext = '.png'
 dispatch = 'SLP'
-plot = False
+plot = True 
 
 script_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -65,7 +65,7 @@ batSizes = [0, 100, 300]
 pvSizes = [0, 50, 100]
 
 # voltage limits
-vmin = 0.97
+vmin = 0.96
 vmax = 1.03
 
 for ba, batSize in enumerate(batSizes): 
@@ -121,11 +121,6 @@ for ba, batSize in enumerate(batSizes):
             OpCost_list = list()
             mOpCost_list = list()
         
-            # save base case LMP 
-            LMP_list.append(LMP) 
-            OpCost_list.append(OperationCost) 
-            mOpCost_list.append(mOperationCost) 
-        
             # create a folder to store LMP per EV
             output_dirEV = pathlib.Path(output_dir).joinpath(f"EV_{ev}")
             
@@ -150,7 +145,7 @@ for ba, batSize in enumerate(batSizes):
                 newDemand = char_obj.charging_driver(output_dirEV, it, demandProfile, prevLMP, LMP_index, plot)
                 
                 # compute scheduling with new demand
-                _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=True, freq="30min", dispatchType=dispatch)
+                _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=plot, freq="30min", dispatchType=dispatch)
         
                 # store corrected values 
                 OpCost_list.append(OperationCost_EVC) 
@@ -225,19 +220,10 @@ for ba, batSize in enumerate(batSizes):
             ### costs
             plt.clf()
             fig, ax = plt.subplots()
-            plt.ylim(bottom=min(OpCost_list))
-            plt.stem(OpCost_list - min(OpCost_list))
+            plt.ylim(min(OpCost_list), 1.02*max(OpCost_list))
+            plt.stem(OpCost_list)
             fig.tight_layout()
             output_img = pathlib.Path(output_dirEV).joinpath("Operation_cost_list"+ ext)
-            plt.savefig(output_img)
-            plt.close('all')
-
-            plt.clf()
-            fig, ax = plt.subplots()
-            plt.ylim(bottom=min(OpCost_list[1:]))
-            plt.stem(OpCost_list[1:] - min(OpCost_list[1:]))
-            fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("Operation_cost_list_1"+ ext)
             plt.savefig(output_img)
             plt.close('all')
 
@@ -245,18 +231,9 @@ for ba, batSize in enumerate(batSizes):
             ###  mcosts
             plt.clf()
             fig, ax = plt.subplots()
-            plt.ylim(bottom=min(mOpCost_list))
+            plt.ylim(min(mOpCost_list), 1.02*max(mOpCost_list))
             plt.stem(mOpCost_list)
             fig.tight_layout()
             output_img = pathlib.Path(output_dirEV).joinpath("mOperation_cost_list"+ ext)
-            plt.savefig(output_img)
-            plt.close('all')
-
-            plt.clf()
-            fig, ax = plt.subplots()
-            plt.ylim(bottom=min(mOpCost_list[1:]))
-            plt.stem(mOpCost_list[1:] - min(mOpCost_list[1:]))
-            fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("mOperation_cost_list_1"+ ext)
             plt.savefig(output_img)
             plt.close('all')

@@ -43,7 +43,7 @@ batSize = 300
 pvSize = 100
 
 # voltage limits
-vmin = 0.97
+vmin = 0.96
 vmax = 1.03
 
 ####################################

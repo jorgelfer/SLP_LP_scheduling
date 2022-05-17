@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 10})
 # from matplotlib.patches import StepPatch
 import seaborn as sns
 import os
@@ -7,13 +7,13 @@ import time
 import pathlib
 import numpy as np
 import pandas as pd
-h = 12 
-w = 12
+h = 8 
+w = 8 
 ext = '.png'
 
 class plottingDispatch:
 
-    def __init__(self, output_dir,  niter, PointsInTime, script_path, vmin, vmax, PTDF=None, Ain=None, title=True, dispatchType='LP'):
+    def __init__(self, output_dir,  niter, PointsInTime, script_path, vmin, vmax, PTDF=None, Ain=None, title=False, dispatchType='LP'):
         
         if Ain is not None:
             self.Ain = Ain
@@ -84,12 +84,16 @@ class plottingDispatch:
 
         # create voltage directory to store results
         output_dirV = pathlib.Path(self.output_dir).joinpath("voltage")
-        if no os.path.isdir(output_dirV):
+        if not os.path.isdir(output_dirV):
             os.mkdir(output_dirV)
 
         output_img = pathlib.Path(output_dirV).joinpath(f"voltage_{self.niter}_{self.timestamp}" + ext)
         plt.savefig(output_img)
         plt.close('all')
+
+        # save as pickle as well
+        output_pkl = pathlib.Path(output_dirV).joinpath(f"voltage_{self.niter}_{self.timestamp}.pkl")
+        concatenated.to_pickle(output_pkl)
         
     def plot_PTDF(self):
 
@@ -139,10 +143,14 @@ class plottingDispatch:
                 fig.tight_layout()
                 # create flows directory to store results
                 output_dirPjk = pathlib.Path(self.output_dir).joinpath("Flows")
-                if no os.path.isdir(output_dirPjk):
+                if not os.path.isdir(output_dirPjk):
                     os.mkdir(output_dirPjk)
                 output_img = pathlib.Path(output_dirPjk).joinpath(f"Power_{na}_{self.niter}_{self.timestamp}" + ext)
                 plt.savefig(output_img)
+                
+                # save as pkl as well
+                output_pkl = pathlib.Path(output_dirPjk).joinpath(f"Power_{na}_{self.niter}_{self.timestamp}.pkl")
+                concatenated.to_pickle(output_pkl)
                 
             cont += ni
             plt.close('all')
