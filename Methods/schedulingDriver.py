@@ -121,7 +121,7 @@ def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1b
         Gmax[np.where(np.any(PV1,axis=1))[0]] =  300        #% Utility scale Solar PV
     
     # define the cost
-    gCost[PVnodes] = 0.1*np.mean(cost_wednesday)
+    gCost[PVnodes] = 0.1*cost_wednesday#*np.mean(cost_wednesday)
     
     # create load helper method
     help_obj = loadHelper(initfreq = 'H', finalFreq = freq)
@@ -205,7 +205,7 @@ def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
 
     return violatingLines, Lmax, Linfo
 
-def compute_violatingVolts(v_0, v_base, vmin=0.962, vmax=1.029):
+def compute_violatingVolts(v_0, v_base, vmin, vmax):
 
     # extract violating Lines
     v_lb = (vmin*1000)*v_base 
@@ -219,7 +219,7 @@ def compute_violatingVolts(v_0, v_base, vmin=0.962, vmax=1.029):
 # define the type of analysis;
 
     
-def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin=0.95, vmax=1.05, PF=True, voltage=True, DR=True, plot=False):
+def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin, vmax, PF=True, voltage=True, DR=True, plot=False):
     
     # define Storage and PV
     if batSize == 0:
@@ -288,7 +288,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     
     #Demand Response (cost of shedding load)
     np.random.seed(2022) # Set random seed so results are repeatable
-    DRcost = np.random.randint(40,300,size=(1,n)) 
+    DRcost = np.random.randint(100,300,size=(1,n)) 
     cdr = np.kron(DRcost, np.ones((1,pointsInTime))) 
     
     #PV system

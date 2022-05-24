@@ -16,31 +16,12 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 import time
 import seaborn as sns
-
-def reorder_dates(pdSeries):
-    pdSeries1 = pdSeries[:pdSeries.index.get_loc('08:00')]
-    pdSeries2 = pdSeries[pdSeries.index.get_loc('08:00'):]
-    pdSeries = pd.concat((pdSeries2, pdSeries1))
-    return pdSeries
-
-def order_dates(array, freq="30min"):
-    # initialize time pdSeries
-    pdSeries = pd.Series(np.zeros(len(array)))
-    pdSeries.index = pd.date_range("00:00", "23:59", freq=freq).strftime('%H:%M')
-    # reorder init dataSeries to match Kartik's order
-    pdSeries = reorder_dates(pdSeries)
-    # assign obtained values
-    pdframe = pdSeries.to_frame()
-    pdframe[0] = array
-    pdSeries = pdframe.squeeze()
-    # order back to normal 
-    pdSeries1 = pdSeries[:pdSeries.index.get_loc('00:00')]
-    pdSeries2 = pdSeries[pdSeries.index.get_loc('00:00'):]
-    pdSeries = pd.concat((pdSeries2, pdSeries1))
-    return pdSeries
+import shutil
+from functools import reduce
 
 ext = '.png'
 dispatch = 'SLP'
+metric = np.inf # 1,2,np.inf
 plot = True 
 
 script_path = os.path.dirname(os.path.abspath(__file__))
@@ -60,18 +41,25 @@ if not os.path.isdir(output_dir12):
 output_dir13 = pathlib.Path(output_dir12).joinpath(dispatch)
 if not os.path.isdir(output_dir13):
     os.mkdir(output_dir13)
+    
+output_dir14 = pathlib.Path(output_dir13).joinpath(f"L_{metric}")
+if not os.path.isdir(output_dir14):
+    os.mkdir(output_dir14)
+else:
+    shutil.rmtree(output_dir14)
+    os.mkdir(output_dir14)
 
-batSizes = [0, 100, 300]
-pvSizes = [0, 50, 100]
+batSizes = [0, 200]
+pvSizes = [0, 100]
 
 # voltage limits
-vmin = 0.96
-vmax = 1.03
+vmin = 0.968
+vmax = 1.028
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
         
-        output_dir1 = pathlib.Path(output_dir13).joinpath(f"bat_{ba}_pv_{pv}")
+        output_dir1 = pathlib.Path(output_dir14).joinpath(f"bat_{ba}_pv_{pv}")
         if not os.path.isdir(output_dir1):
             os.mkdir(output_dir1)
             
@@ -86,7 +74,7 @@ for ba, batSize in enumerate(batSizes):
         LMP_size = np.size(LMP,0)
         initEnergy_list = [np.random.uniform(18, 70) for i in range(LMP_size)]
         # define ev capacity
-        evCapacity_list = [np.random.uniform(81.5, 89.5) for i in range(LMP_size)]
+        evCapacity_list = [np.random.uniform(101.5, 109.5) for i in range(LMP_size)]
         # define arrival time
         arrivalTime_list = [f"{np.random.randint(16, 22)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
         # define departure time
@@ -94,7 +82,8 @@ for ba, batSize in enumerate(batSizes):
         # create weights using dirichlet distribution: the sumation add up to 1
         initW_list = [np.random.dirichlet(np.ones(4),size=1) for i in range(LMP_size)]
         # LMP index random
-        LMP_index = np.random.choice(LMP_size, LMP_size, replace=False)
+        # LMP_index = np.random.choice(LMP_size, LMP_size, replace=False)
+        LMP_index = LMP.sample(frac=1, random_state=np.random.RandomState(2022)).index 
 
         # create smart charging driver object
         char_obj = smartCharging_driver(ext, arrivalTime_list, departureTime_list, initEnergy_list, evCapacity_list, initW_list) 
@@ -108,41 +97,56 @@ for ba, batSize in enumerate(batSizes):
         # Second thing: compute the decentralized smart charging
         ####################################
         
-        # define number of iterations
-        iterations = 10 
-        evh = [60, 70, -1]
+        # define number of max iterations
+        maxIter = 30 
+        evh = [60, -1]
         evh_size = len(evh)
         
         # number of EV loop
         for ev in range(evh_size): 
             # initialize store variables as lists
-            prevLMP = LMP.copy() 
-            prevDemand = demandProfile.copy()
             OpCost_list = list()
             mOpCost_list = list()
+            LMP_list = list()
+            demand_list = list()
+
+            # initial append
+            LMP_list.append(LMP)
+            demand_list.append(demandProfile)
         
             # create a folder to store LMP per EV
             output_dirEV = pathlib.Path(output_dir).joinpath(f"EV_{ev}")
-            
             if not os.path.isdir(output_dirEV):
                 os.mkdir(output_dirEV)
                 
             # per node LMP comparison
-            dLMP_node_L2 = np.zeros((len(LMP.index), iterations))
-            dLMP_node_L1 = np.zeros((len(LMP.index), iterations))
-            dLMP_node_Linf = np.zeros((len(LMP.index), iterations))
+            dLMP_list = list()
 
             # prelocate demand difference variable
             diffDemand = np.zeros(demandProfile.shape)
 
             # iterations loop
-            for it in range(iterations): 
+            sum_dLMP = 100
+            tol = 10
+            it=0
+            sum_dLMP_list = list()
+            
+            while sum_dLMP > tol and it < maxIter: 
                 
                 # keep track
                 print(f"bat:{ba}_pv:{pv}_EV:{ev}_it:{it}")
+                
+                # novelty criterion
+                if it == 0:
+                    mean_LMP = LMP_list[-1]
+                else:
+                    aux2 = [(dLMP/sum(dLMP_list)) for dLMP in  dLMP_list]  #debug             
+                    aux1 = [np.expand_dims((dLMP/sum(dLMP_list)),axis=1) * LMPi.values  for dLMP, LMPi in zip(dLMP_list, LMP_list[1:])]
+                    mean_LMP = pd.DataFrame(sum(aux1), index=LMP.index, columns=LMP.columns)
         
                 # compute EV corrected demand
-                newDemand = char_obj.charging_driver(output_dirEV, it, demandProfile, prevLMP, LMP_index, plot)
+                newDemand = char_obj.charging_driver(output_dirEV, it, demandProfile, mean_LMP, LMP_index[:evh[ev]], plot)
+                demand_list.append(newDemand)
                 
                 # compute scheduling with new demand
                 _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=plot, freq="30min", dispatchType=dispatch)
@@ -150,14 +154,16 @@ for ba, batSize in enumerate(batSizes):
                 # store corrected values 
                 OpCost_list.append(OperationCost_EVC) 
                 mOpCost_list.append(mOperationCost_EVC) 
-                
+                LMP_list.append(LMP_EVC) 
+
                 # store node-base LMP difference
-                dLMP_node_L2[:,it] = np.linalg.norm(LMP_EVC - prevDemand, ord=2, axis=1)
-                dLMP_node_L1[:,it] = np.linalg.norm(LMP_EVC - prevDemand, ord=1, axis=1)
-                dLMP_node_Linf[:,it] = np.linalg.norm(LMP_EVC - prevDemand, ord=np.inf, axis=1)
+                dLMP_list.append(np.linalg.norm(LMP_list[it+1].values - LMP_list[it].values, ord=metric, axis=1))
+                sum_dLMP = np.linalg.norm(LMP_list[it+1].values - LMP_list[it].values, ord=metric)
 
                 # Store demand difference
-                diffDemand = newDemand - prevDemand
+                # diffDemand = newDemand - prevDemand
+                diffDemand = demand_list[it+1].values - demand_list[it].values 
+
                 if plot:
                     diffDemand_pd = pd.DataFrame(diffDemand)
                     fig, ax = plt.subplots()
@@ -172,58 +178,33 @@ for ba, batSize in enumerate(batSizes):
                     plt.savefig(output_img)
                     plt.close('all')
 
-                # assign new definition
-                prevLMP = LMP_EVC.copy() 
-                prevDemand = newDemand.copy()
-
+                    output_pkl = pathlib.Path(output_dirDemand).joinpath(f"Demand_diff_it_{it}.pkl")
+                    diffDemand_pd.to_pickle(output_pkl)
+                
+                it += 1
+                
             ##########
             # node based LMP difference (L2)
-            pd_dLMP = pd.DataFrame(dLMP_node_L2)
-            dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_L2.pkl")
+            pd_dLMP = pd.DataFrame(np.hstack(dLMP_list))
+            dLMP_file = pathlib.Path(output_dirEV).joinpath(f"dLMP_it{it}.pkl")
             pd_dLMP.to_pickle(dLMP_file)
             # plot
             plt.clf()
             fig, ax = plt.subplots()
             sns.heatmap(pd_dLMP, annot=False)
             fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("dLMP_node_L2"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath(f"dLMP__it{it}"+ ext)
             plt.savefig(output_img)
             plt.close('all')
-            
-            # node base LMP difference
-            pd_dLMP = pd.DataFrame(dLMP_node_L1)
-            dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_L1.pkl")
-            pd_dLMP.to_pickle(dLMP_file)
-            # plot
-            plt.clf()
-            fig, ax = plt.subplots()
-            sns.heatmap(pd_dLMP, annot=False)
-            fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("dLMP_node_L1"+ ext)
-            plt.savefig(output_img)
-            plt.close('all')
-            
-            # node base LMP difference (Linf)
-            pd_dLMP = pd.DataFrame(dLMP_node_Linf)
-            dLMP_file = pathlib.Path(output_dirEV).joinpath("dLMP_node_Linf.pkl")
-            pd_dLMP.to_pickle(dLMP_file)
-            # plot
-            plt.clf()
-            fig, ax = plt.subplots()
-            sns.heatmap(pd_dLMP, annot=False)
-            fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("dLMP_node_Linf"+ ext)
-            plt.savefig(output_img)
-            plt.close('all')
-        
+                    
             ########################
             ### costs
             plt.clf()
             fig, ax = plt.subplots()
-            plt.ylim(min(OpCost_list), 1.02*max(OpCost_list))
+            plt.ylim(0.999*min(OpCost_list), 1.001*max(OpCost_list))
             plt.stem(OpCost_list)
             fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("Operation_cost_list"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath(f"Operation_cost_list_it{it}"+ ext)
             plt.savefig(output_img)
             plt.close('all')
 
@@ -231,9 +212,9 @@ for ba, batSize in enumerate(batSizes):
             ###  mcosts
             plt.clf()
             fig, ax = plt.subplots()
-            plt.ylim(min(mOpCost_list), 1.02*max(mOpCost_list))
+            plt.ylim(0.999*min(mOpCost_list), 1.001*max(mOpCost_list))
             plt.stem(mOpCost_list)
             fig.tight_layout()
-            output_img = pathlib.Path(output_dirEV).joinpath("mOperation_cost_list"+ ext)
+            output_img = pathlib.Path(output_dirEV).joinpath(f"mOperation_cost_list_it{it}"+ ext)
             plt.savefig(output_img)
             plt.close('all')

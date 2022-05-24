@@ -31,11 +31,6 @@ class SmartCharging:
         # vehicle charge constraints
         self.P_V_lb = np.zeros((pointsInTime,1))
 
-        # vehicle energy constraints
-        self.E_V_min = 18
-
-        # fixed value - Vehicle energy at final time
-        self.E_V_T_min = 81
 
         # storage values
         self.P_B_min = 0
@@ -81,15 +76,22 @@ class SmartCharging:
     
     def __processInitialConditions(self, arrivingTime, departureTime, initEnergy, evCapacity):
 
-        self.E_V_1 = initEnergy # EV initial energy 
+        # vehicle energy constraints
         self.E_V_max = evCapacity # EV max capacity 
+        self.E_V_min = 18
+
+        # fixed value - Vehicle energy at final time
         self.E_V_T_max = self.E_V_max # EV final state constraint 
+        self.E_V_T_min = 0.9*self.E_V_max
+ 
+        # EV initial energy 
+        self.E_V_1 = initEnergy # EV initial energy 
 
         # build vehicle max charge
         init_ub = pd.Series(np.zeros(self.T))
         init_ub.index = pd.date_range("00:00", "23:59", freq="30min").strftime('%H:%M')
-        init_ub.loc[arrivingTime::] = 7.6
-        init_ub.loc[:departureTime] = 7.6
+        init_ub.loc[arrivingTime::] = 8.6
+        init_ub.loc[:departureTime] = 8.6
         # reorder to match kartik inputs
         init_ub = self.__reorder_dates(init_ub)
         P_V_ub = np.expand_dims(init_ub.values, axis=1)

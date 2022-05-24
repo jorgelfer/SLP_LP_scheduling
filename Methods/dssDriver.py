@@ -67,22 +67,22 @@ def get_nodePowers(dss, nodeNames):
     return Pa, Qa
 
 #driver function:
-def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, dfDemand, dfDemandQ, dispatchType, vmin=0.95, vmax=1.05, out=None, plot=True):
+def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, out=None, plot=True):
 
     dss.text(f"Compile [{dssFile}]") 
     set_baseline(dss)
 
     # create a sensitivity object
-    sen_obj = sensitivityPy(dss, time=0)
+    sen_obj_0 = sensitivityPy(dss, time=0)
     
     # get all node-based base volts 
-    nodeBaseVoltage = sen_obj.get_nodeBaseVolts()
+    nodeBaseVoltage = sen_obj_0.get_nodeBaseVolts()
 
     # get all node-based buses, 
     nodeNames = dss.circuit_all_node_names()
 
     # get all node-based lines names
-    nodeLineNames = sen_obj.get_nodeLineNames()
+    nodeLineNames = sen_obj_0.get_nodeLineNames()
 
     # points in time
     pointsInTime = len(dfDemand.columns)

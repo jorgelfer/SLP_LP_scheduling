@@ -29,20 +29,20 @@ class smartCharging_driver:
     
         # prelocate EV demand
         EV_demandProfile = np.zeros(demandProfile.shape)
-        EV_demandProfile = pd.DataFrame(EV_demandProfile, index=LMP.index, columns=LMP.columns)
+        EV_demandProfile = pd.DataFrame(EV_demandProfile, index=demandProfile.index, columns=demandProfile.columns)
         
         # create smart charging object
         charging_obj = SmartCharging(numberOfHours=24, pointsInTime=LMP.shape[1]) 
         
-        for i, ind in enumerate(LMP_index.tolist()):
+        for i, ind in enumerate(LMP_index):
             #individual LMP (pi)
-            pi = LMP.iloc[ind,:]
+            pi = LMP.loc[ind,:]
             # reorder dates
             pi = self.__reorder_dates(pi)
             # transform to array
             pi = np.expand_dims(pi.values, axis=1)
             # household demand profile
-            PH = demandProfile.iloc[ind,:] # normal demand
+            PH = demandProfile.loc[ind,:] # normal demand
             # reorder dates
             PH = self.__reorder_dates(PH)
             PH = np.expand_dims(PH.values, axis=1)
@@ -59,10 +59,11 @@ class smartCharging_driver:
             # reorder index from dataSeries:
             PV_star = self.__order_dates(PV_star, freq="30min")
             # assign to the profile
-            EV_demandProfile.iloc[ind,:] = PV_star
+            EV_demandProfile.loc[ind,:] = PV_star
             
         #define new demand
-        newDemand = demandProfile + EV_demandProfile
+        newDemand = demandProfile.values + EV_demandProfile.values
+        newDemand = pd.DataFrame(newDemand, index=demandProfile.index, columns=demandProfile.columns)
     
         if plot:
             # new demand plot

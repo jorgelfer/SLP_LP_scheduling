@@ -113,7 +113,8 @@ def getInitDemand(scriptPath, dss, freq):
     #Reactive Power df
     #if fixed power factor:
     # random power factors
-    PF = np.random.uniform(0.8, 1, size=len(dfDemand.index))
+    np.random.seed(2022)
+    PF = np.random.uniform(0.85, 1, size=len(dfDemand.index))
     dfDemandQ = (np.tan(np.arccos(PF)) * dfDemand.T).T
     # else:
     #dfDemandQ = pd.DataFrame(demandQrofile) 

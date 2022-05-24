@@ -87,7 +87,7 @@ class plottingDispatch:
         if not os.path.isdir(output_dirV):
             os.mkdir(output_dirV)
 
-        output_img = pathlib.Path(output_dirV).joinpath(f"voltage_{self.niter}_{self.timestamp}" + ext)
+        output_img = pathlib.Path(self.output_dir).joinpath(f"voltage_{self.niter}_{self.timestamp}" + ext)
         plt.savefig(output_img)
         plt.close('all')
 
@@ -145,7 +145,7 @@ class plottingDispatch:
                 output_dirPjk = pathlib.Path(self.output_dir).joinpath("Flows")
                 if not os.path.isdir(output_dirPjk):
                     os.mkdir(output_dirPjk)
-                output_img = pathlib.Path(output_dirPjk).joinpath(f"Power_{na}_{self.niter}_{self.timestamp}" + ext)
+                output_img = pathlib.Path(self.output_dir).joinpath(f"Power_{na}_{self.niter}_{self.timestamp}" + ext)
                 plt.savefig(output_img)
                 
                 # save as pkl as well
@@ -194,9 +194,18 @@ class plottingDispatch:
             plt.ylabel('Power (kW)', fontsize=12)
             plt.xlabel('Time (hrs)', fontsize=12)
         fig.tight_layout()
+
+        output_dirDispatch = pathlib.Path(self.output_dir).joinpath("Dispatch")
+        if not os.path.isdir(output_dirDispatch):
+            os.mkdir(output_dirDispatch)
+
         output_img = pathlib.Path(self.output_dir).joinpath(f"Power_Dispatch_{self.niter}_{self.timestamp}"+ ext)
         plt.savefig(output_img)
         plt.close('all')
+
+        # save as pkl as well
+        output_pkl = pathlib.Path(output_dirDispatch).joinpath(f"Power_Dispatch_{self.niter}_{self.timestamp}.pkl")
+        Pg.to_pickle(output_pkl)
 
     def plot_DemandResponse(self, Pdr):
 
@@ -213,9 +222,18 @@ class plottingDispatch:
             ax.set_title(f'Demand Response - total {round(np.sum(Pdr),3)}', fontsize=15)
             plt.ylabel('Power (kW)', fontsize=15)
             plt.xlabel('Time (hrs)', fontsize=15)
+
+        output_dirDR = pathlib.Path(self.output_dir).joinpath("DR")
+        if not os.path.isdir(output_dirDR):
+            os.mkdir(output_dirDR)
+
         output_img = pathlib.Path(self.output_dir).joinpath(f"DemandResponse_{self.niter}_{self.timestamp}"+ ext)
         plt.savefig(output_img)
         plt.close('all')
+
+        # save as pkl as well
+        output_pkl = pathlib.Path(output_dirDR).joinpath(f"DemandResponse_{self.niter}_{self.timestamp}.pkl")
+        Pdr.to_pickle(output_pkl)
 
     def plot_storage(self, E, batt, cgn):
 
