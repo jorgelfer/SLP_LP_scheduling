@@ -127,7 +127,7 @@ for ba, batSize in enumerate(batSizes):
 
             # iterations loop
             sum_dLMP = 100
-            tol = 10
+            tol = 50
             it=0
             sum_dLMP_list = list()
             
@@ -181,11 +181,14 @@ for ba, batSize in enumerate(batSizes):
                     output_pkl = pathlib.Path(output_dirDemand).joinpath(f"Demand_diff_it_{it}.pkl")
                     diffDemand_pd.to_pickle(output_pkl)
                 
+                if it != 0:
+                    if mOpCost_list[it] > mOpCost_list[it-1]:
+                        break
                 it += 1
                 
             ##########
             # node based LMP difference (L2)
-            pd_dLMP = pd.DataFrame(np.hstack(dLMP_list))
+            pd_dLMP = pd.DataFrame(np.stack(dLMP_list,1))
             dLMP_file = pathlib.Path(output_dirEV).joinpath(f"dLMP_it{it}.pkl")
             pd_dLMP.to_pickle(dLMP_file)
             # plot
