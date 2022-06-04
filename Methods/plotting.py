@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-plt.rcParams.update({'font.size': 10})
+plt.rcParams.update({'font.size': 20})
 # from matplotlib.patches import StepPatch
 import seaborn as sns
 import os
@@ -7,9 +7,9 @@ import time
 import pathlib
 import numpy as np
 import pandas as pd
-h = 8 
-w = 8 
-ext = '.png'
+h = 6 
+w = 4 
+ext = '.pdf'
 
 class plottingDispatch:
 
@@ -69,7 +69,7 @@ class plottingDispatch:
         dfLimits = pd.DataFrame(limits, index = ['lower limit', 'upper limit'], columns = vpu.columns)
         
         plt.clf()
-        fig, ax = plt.subplots() 
+        fig, ax = plt.subplots(figsize=(h,w)) 
         
         # concatenate dataframes
         concatenated = pd.concat([vpu, dfLimits])
@@ -125,10 +125,10 @@ class plottingDispatch:
         cont = 0
         for ni, na in zip(nil, namel):
             
-            if np.any(Pij.values[cont:cont + ni,:] > lmax.values[cont:cont + ni,:]):
-            # if na == "Line.l3" or na == "Line.l7" or na == "Line.l10" or na == "Line.l115" or na == "Line.sw1":
+            # if np.any(Pij.values[cont:cont + ni,:] > lmax.values[cont:cont + ni,:]):
+            if na == "Line.l3" or na == "Line.l115" or na == "Line.sw1":
                 plt.clf()
-                fig, ax = plt.subplots()                
+                fig, ax = plt.subplots(figsize=(h,w))                
                 # leg = [node for node in Pij.index[cont:cont + ni]]
                 lim = lmax[cont:cont + ni].mean(axis = 0).to_frame()
                 lim.columns = ['Thermal limit']
@@ -164,7 +164,7 @@ class plottingDispatch:
         
         # index = np.where(DemandProfilei) 
         plt.clf()
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(h,w))
         
         totalDemand.T.plot(style='o--', color = 'grey', alpha=0.3)
         totalDemand.T.step()
@@ -186,7 +186,7 @@ class plottingDispatch:
         #######################
     
         plt.clf()
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(h,w))
         Pg = Pg[Pg.any(axis=1)]
         Pg.T.plot(legend=False) # use any to plot dispatched nodes
         if self.title:
@@ -214,9 +214,10 @@ class plottingDispatch:
         #######################
     
         plt.clf()
-        fig, ax = plt.subplots()
-        # Pdr = Pdr[Pdr.any(axis=1)] # use any to plot dispatched nodes
+        fig, ax = plt.subplots(figsize=(h,w))
+        legendi = Pdr[Pdr.any(axis=1)].index.tolist() # use any to plot dispatched nodes
         Pdr.T.plot(legend=False)
+        ax.legend(legendi, prop={'size': 10})
         
         if self.title:
             ax.set_title(f'Demand Response - total {round(np.sum(Pdr),3)}', fontsize=15)
@@ -245,7 +246,7 @@ class plottingDispatch:
         row, _ = np.where(batt['BatIncidence']==1)
     
         plt.clf()
-        fig, ax1 = plt.subplots()
+        fig, ax1 = plt.subplots(figsize=(h,w))
         leg = [self.PTDF.columns[node] for node in row]
         xrange = np.arange(1,self.PointsInTime+1,1)
         ax1.step(xrange,(E).T)
@@ -290,7 +291,7 @@ class plottingDispatch:
          
         for i in range(nplots):
             plt.clf()
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(h,w))
             try:
                 LMPdemand[i*k:cont].T.plot()
             except:
