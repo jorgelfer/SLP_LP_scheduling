@@ -133,9 +133,6 @@ for ba, batSize in enumerate(batSizes):
             
             while sum_dLMP > tol and it < maxIter: 
                 
-                # keep track
-                print(f"bat:{ba}_pv:{pv}_EV:{ev}_it:{it}")
-                
                 # novelty criterion
                 if it == 0:
                     mean_LMP = LMP_list[-1]
@@ -159,6 +156,9 @@ for ba, batSize in enumerate(batSizes):
                 # store node-base LMP difference
                 dLMP_list.append(np.linalg.norm(LMP_list[it+1].values - LMP_list[it].values, ord=metric, axis=1))
                 sum_dLMP = np.linalg.norm(LMP_list[it+1].values - LMP_list[it].values, ord=metric)
+
+                # keep track
+                print(f"bat:{ba}_pv:{pv}_EV:{ev}_it:{it}_diff={sum_dLMP}_cost:{np.round(OpCost_list[-1],2)}")
 
                 # Store demand difference
                 # diffDemand = newDemand - prevDemand
