@@ -55,8 +55,8 @@ batSizes = [0]
 pvSizes = [0]
 
 # voltage limits
-vmin = 0.968
-vmax = 1.028
+vmin = 0.95
+vmax = 1.05
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
@@ -76,7 +76,7 @@ for ba, batSize in enumerate(batSizes):
         LMP_size = np.size(LMP,0)
         initEnergy_list = [np.random.uniform(18, 70) for i in range(LMP_size)]
         # define ev capacity
-        evCapacity_list = [np.random.uniform(101.5, 109.5) for i in range(LMP_size)]
+        evCapacity_list = [np.random.uniform(80.5, 118) for i in range(LMP_size)]
         # define arrival time
         arrivalTime_list = [f"{np.random.randint(16, 22)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
         # define departure time

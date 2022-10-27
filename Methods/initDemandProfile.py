@@ -114,7 +114,7 @@ def getInitDemand(scriptPath, dss, freq):
     #if fixed power factor:
     # random power factors
     np.random.seed(2022)
-    PF = np.random.uniform(0.85, 1, size=len(dfDemand.index))
+    PF = 0.9 # np.random.uniform(0.85, 1, size=len(dfDemand.index))
     dfDemandQ = (np.tan(np.arccos(PF)) * dfDemand.T).T
     # else:
     #dfDemandQ = pd.DataFrame(demandQrofile) 

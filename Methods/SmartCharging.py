@@ -90,8 +90,8 @@ class SmartCharging:
         # build vehicle max charge
         init_ub = pd.Series(np.zeros(self.T))
         init_ub.index = pd.date_range("00:00", "23:59", freq="30min").strftime('%H:%M')
-        init_ub.loc[arrivingTime::] = 8.6
-        init_ub.loc[:departureTime] = 8.6
+        init_ub.loc[arrivingTime::] = 7.6
+        init_ub.loc[:departureTime] = 7.6
         # reorder to match kartik inputs
         init_ub = self.__reorder_dates(init_ub)
         P_V_ub = np.expand_dims(init_ub.values, axis=1)
