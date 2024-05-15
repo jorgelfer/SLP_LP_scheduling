@@ -94,9 +94,9 @@ def load_generationCosts(script_path, n, pointsInTime, freq):
     cost_wednesday = pd.Series(tcost.values[225,1:-1]) # 2018-08-14
     # call method for processing series
     cost_wednesday = help_obj.process_pdSeries(cost_wednesday)
-    cost_wednesday = np.squeeze(cost_wednesday.values)
-    
-    gCost[0,:] = cost_wednesday
+    cost_wednesday = np.squeeze(cost_wednesday.values * 1e-3) # $/MWh -> $/kWh
+
+    gCost[0,:] = cost_wednesday 
     gCost[1,:] = cost_wednesday
     gCost[2,:] = cost_wednesday
     
@@ -143,7 +143,7 @@ def compute_penaltyFactors(batt, PTDF):
     '''function to Compute penalty factors'''
         
     # compute dPgref
-    dPgref = np.min(PTDF[:3])
+    dPgref = np.min(PTDF[:3], axis=0)
     
     # dPl/dPgi = 1 - (- dPgref/dPgi) -> eq. L9_25
     
@@ -275,6 +275,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     ## Generation settings
     # Load generation costs
     gCost, cost_wednesday = load_generationCosts(script_path, n, pointsInTime, freq)
+    subCost = pd.DataFrame(gCost[0:3,:], index=PTDF.columns[0:3], columns=v_0.columns)
+
        
     # Define generation limits
     Gmax = np.zeros((n,1))
@@ -288,7 +290,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     
     #Demand Response (cost of shedding load)
     np.random.seed(2022) # Set random seed so results are repeatable
-    DRcost = np.random.randint(100,300,size=(1,n)) 
+    DRcost = np.random.rand(1,n) 
     cdr = np.kron(DRcost, np.ones((1,pointsInTime))) 
     
     #PV system
@@ -339,6 +341,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     lnodes = np.where(demandProfilei)[0]    
     # Define the output as Pandas DataFrame
     outGen, outDR, outPchar, outPdis, outLMP = create_output(Pg, Pdr, Pchar, Pdis, LMP_Pg, loadNames, PTDF, lnodes=lnodes, Snodes=Snodes, PVnodes=PVnodes, timeVec=v_0.columns, PV=PV, storage=storage)
+    outLMP = pd.concat([subCost, outLMP], axis=0)
+    print(outLMP.head())
     
     if plot:
         
@@ -355,7 +359,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
             plot_obj.plot_storage(E, batt, gCost[0,:])
         
         ## ploting LMPs
-        #plot_obj.plot_LMP(outLMP, 'gen')
+        # plot_obj.plot_LMP(outLMP, 'gen')
         
         # if LMP_Pdr is not None:
         #     LMP_Pdr = pd.DataFrame(LMP_Pdr, PTDF.columns, v_0.columns)
