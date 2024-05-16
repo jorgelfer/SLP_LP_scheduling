@@ -75,8 +75,10 @@ class SLP_dispatch:
             Aeq, A = self.__addStorage_A(Aeq, A)
             # modify beq, lb, ub, f
             beq, ub, lb, f = self.__addStorage_rest(beq, ub, lb, f)
-            lb = lb.tolist()
-            ub = ub.tolist()
+
+        # convert to iterable for gurobi
+        lb = lb[0].tolist()
+        ub = ub[0].tolist()
             
         # compute linear program optimization
         x, m, LMP = self.__linprog(f, Aeq, beq, A, b, lb, ub)

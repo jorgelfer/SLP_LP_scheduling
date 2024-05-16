@@ -6,3 +6,4 @@ __pycache__/
 Methods/__pycache__/
 outputs/*
 !outputs/.gitkeep
+venv/
