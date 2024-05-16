@@ -52,8 +52,8 @@ else:
     shutil.rmtree(output_dir14)
     os.mkdir(output_dir14)
 
-batSizes = [0, 200]
-pvSizes = [0, 200]
+batSizes = [0]
+pvSizes = [0]
 
 # voltage limits
 vmin = 0.95
@@ -81,96 +81,96 @@ for ba, batSize in enumerate(batSizes):
         plt.savefig(output_img)
         plt.close('all')
         
-        LMP = LMP.iloc[3:,:] # remove first 3 rows
+        # LMP = LMP.iloc[3:,:] # remove first 3 rows
                 
-        # Set random seed so results are repeatable
-        np.random.seed(2022) 
-        # define init energy 
-        LMP_size = np.size(LMP,0)
-        initEnergy_list = [np.random.uniform(18, 70) for i in range(LMP_size)]
-        # define ev capacity
-        evCapacity_list = [np.random.uniform(80.5, 118) for i in range(LMP_size)]
-        # define arrival time
-        arrivalTime_list = [f"{np.random.randint(16, 22)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
-        # define departure time
-        departureTime_list = [f"{np.random.randint(6, 12)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
-        # create weights using dirichlet distribution: the sumation add up to 1
-        initW_list = [np.random.dirichlet(np.ones(4),size=1) for i in range(LMP_size)]
-        # LMP index random
-        # LMP_index = np.random.choice(LMP_size, LMP_size, replace=False)
-        LMP_index = LMP.sample(frac=1, random_state=np.random.RandomState(2022)).index 
+        # # Set random seed so results are repeatable
+        # np.random.seed(2022) 
+        # # define init energy 
+        # LMP_size = np.size(LMP,0)
+        # initEnergy_list = [np.random.uniform(18, 70) for i in range(LMP_size)]
+        # # define ev capacity
+        # evCapacity_list = [np.random.uniform(80.5, 118) for i in range(LMP_size)]
+        # # define arrival time
+        # arrivalTime_list = [f"{np.random.randint(16, 22)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
+        # # define departure time
+        # departureTime_list = [f"{np.random.randint(6, 12)}:{np.random.randint(0,2)*3}0" for i in range(LMP_size)]
+        # # create weights using dirichlet distribution: the sumation add up to 1
+        # initW_list = [np.random.dirichlet(np.ones(4),size=1) for i in range(LMP_size)]
+        # # LMP index random
+        # # LMP_index = np.random.choice(LMP_size, LMP_size, replace=False)
+        # LMP_index = LMP.sample(frac=1, random_state=np.random.RandomState(2022)).index 
 
-        # create smart charging driver object
-        char_obj = smartCharging_driver(ext, arrivalTime_list, departureTime_list, initEnergy_list, evCapacity_list, initW_list) 
+        # # create smart charging driver object
+        # char_obj = smartCharging_driver(ext, arrivalTime_list, departureTime_list, initEnergy_list, evCapacity_list, initW_list) 
         
-        # define folder to store smartcharging results
-        output_dir = pathlib.Path(output_dir1).joinpath("SmartCharging")
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
+        # # define folder to store smartcharging results
+        # output_dir = pathlib.Path(output_dir1).joinpath("SmartCharging")
+        # if not os.path.isdir(output_dir):
+        #     os.mkdir(output_dir)
             
-        ####################################
-        # Second thing: compute the decentralized smart charging
-        ####################################
+        # ####################################
+        # # Second thing: compute the decentralized smart charging
+        # ####################################
         
-        evh = [-1]
-        evh_size = len(evh)
-        # number of EV loop
-        for ev in range(evh_size): 
-            # initialize store variables as lists
-            OpCost_list = list()
-            mOpCost_list = list()
-            LMP_list = list()
-            demand_list = list()
+        # evh = [-1]
+        # evh_size = len(evh)
+        # # number of EV loop
+        # for ev in range(evh_size): 
+        #     # initialize store variables as lists
+        #     OpCost_list = list()
+        #     mOpCost_list = list()
+        #     LMP_list = list()
+        #     demand_list = list()
 
-            # initial append
-            LMP_list.append(LMP)
-            demand_list.append(demandProfile)
+        #     # initial append
+        #     LMP_list.append(LMP)
+        #     demand_list.append(demandProfile)
         
-            # create a folder to store LMP per EV
-            output_dirEV = pathlib.Path(output_dir).joinpath(f"EV_{ev}")
-            if not os.path.isdir(output_dirEV):
-                os.mkdir(output_dirEV)
+        #     # create a folder to store LMP per EV
+        #     output_dirEV = pathlib.Path(output_dir).joinpath(f"EV_{ev}")
+        #     if not os.path.isdir(output_dirEV):
+        #         os.mkdir(output_dirEV)
                 
-            # per node LMP comparison
-            dLMP_list = list()
+        #     # per node LMP comparison
+        #     dLMP_list = list()
 
-            # prelocate demand difference variable
-            diffDemand = np.zeros(demandProfile.shape)
+        #     # prelocate demand difference variable
+        #     diffDemand = np.zeros(demandProfile.shape)
 
-            # define number of max iterations
-            maxIter = 30 
-            sum_dLMP = 100
-            sum_dLMP_list = list()
-            tol = 70
-            it=0
+        #     # define number of max iterations
+        #     maxIter = 30 
+        #     sum_dLMP = 100
+        #     sum_dLMP_list = list()
+        #     tol = 70
+        #     it=0
             
-            # # iterations loop
-            # while sum_dLMP > tol and it < maxIter: 
+        #     # # iterations loop
+        #     # while sum_dLMP > tol and it < maxIter: 
                 
-            # novelty criterion
-            if it == 0:
-                mean_LMP = LMP_list[-1]
-            else:
-                aux2 = [(dLMP/sum(dLMP_list)) for dLMP in  dLMP_list]  #debug             
-                aux1 = [np.expand_dims((dLMP/sum(dLMP_list)),axis=1) * LMPi.values  for dLMP, LMPi in zip(dLMP_list, LMP_list[1:])]
-                mean_LMP = pd.DataFrame(sum(aux1), index=LMP.index, columns=LMP.columns)
+        #     # novelty criterion
+        #     if it == 0:
+        #         mean_LMP = LMP_list[-1]
+        #     else:
+        #         aux2 = [(dLMP/sum(dLMP_list)) for dLMP in  dLMP_list]  #debug             
+        #         aux1 = [np.expand_dims((dLMP/sum(dLMP_list)),axis=1) * LMPi.values  for dLMP, LMPi in zip(dLMP_list, LMP_list[1:])]
+        #         mean_LMP = pd.DataFrame(sum(aux1), index=LMP.index, columns=LMP.columns)
     
-            # compute EV corrected demand
-            newDemand = char_obj.charging_driver(output_dirEV, it, demandProfile, mean_LMP, LMP_index[:evh[ev]], plot)
-            demand_list.append(newDemand)
+        #     # compute EV corrected demand
+        #     newDemand = char_obj.charging_driver(output_dirEV, it, demandProfile, mean_LMP, LMP_index[:evh[ev]], plot)
+        #     demand_list.append(newDemand)
             
-            # compute scheduling with new demand
-            _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=plot, freq="30min", dispatchType=dispatch)
+        #     # compute scheduling with new demand
+        #     _, LMP_EVC, OperationCost_EVC, mOperationCost_EVC = SLP_LP_scheduling(batSize, pvSize, output_dirEV, vmin, vmax, userDemand=newDemand, plot=plot, freq="30min", dispatchType=dispatch)
 
-            # save EVC LMP
-            plt.clf()
-            fig, ax = plt.subplots(figsize=(h,w))
-            LMP_EVC.T.plot(legend=False)
-            ax.set_title(f"EVC_LMP - bat:{batSize}_pv:{pvSize}")
-            fig.tight_layout()
-            output_img = pathlib.Path(script_path).joinpath(f"EVC_LMP_bat_{batSize}_pv_{pvSize}"+ ext)
-            plt.savefig(output_img)
-            plt.close('all')
+        #     # save EVC LMP
+        #     plt.clf()
+        #     fig, ax = plt.subplots(figsize=(h,w))
+        #     LMP_EVC.T.plot(legend=False)
+        #     ax.set_title(f"EVC_LMP - bat:{batSize}_pv:{pvSize}")
+        #     fig.tight_layout()
+        #     output_img = pathlib.Path(script_path).joinpath(f"EVC_LMP_bat_{batSize}_pv_{pvSize}"+ ext)
+        #     plt.savefig(output_img)
+        #     plt.close('all')
         
             #     # store corrected values 
             #     OpCost_list.append(OperationCost_EVC) 

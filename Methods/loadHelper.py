@@ -27,7 +27,7 @@ class loadHelper:
         # transform string index into datetime index
         df.index = pd.to_datetime(time)
         
-        if self.finalFreq == 'H':
+        if self.finalFreq == 'h':
             return df
         
         # interpolate
@@ -51,7 +51,7 @@ class loadHelper:
         # transform string index into datetime index
         df.index = pd.to_datetime(time)
         
-        if self.finalFreq == 'H':
+        if self.finalFreq == 'h':
             return df
         
         # interpolate

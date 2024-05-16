@@ -49,7 +49,7 @@ def load_hourlyDemand(scriptPath, numLoads, freq):
     t = t.set_index('Hour')
 
     # create load helper method
-    help_obj = loadHelper(initfreq = 'H', finalFreq = freq)
+    help_obj = loadHelper(initfreq = 'h', finalFreq = freq)
 
     # call method for processing series
     dfDemand = help_obj.process_pdFrame(t)
@@ -62,7 +62,7 @@ def load_GenerationMix(script_path, freq):
     t = pd.read_excel(GenMix_file)
     
     # create load helper method
-    help_obj = loadHelper(initfreq = 'H', finalFreq = freq)
+    help_obj = loadHelper(initfreq = 'h', finalFreq = freq)
     
     # load genalpha with interpolation
     genAlpha = t["Alpha"]
