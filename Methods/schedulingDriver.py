@@ -84,14 +84,16 @@ def load_PTDF(script_path, case):
 def load_generationCosts(script_path, n, pointsInTime, freq):
     '''function to load generations costs and perform interpolation'''
     
-    GenPrice_file = pathlib.Path(script_path).joinpath("inputs", "HourlyMarginalPrice.xlsx")
-    tcost = pd.read_excel(GenPrice_file)
+    # GenPrice_file = pathlib.Path(script_path).joinpath("inputs", "HourlyMarginalPrice.xlsx")
+    # tcost = pd.read_excel(GenPrice_file)
+    tcost = np.asarray([18.78, 19.35, 19.6, 20.28, 27.69, 34.93, 36.33, 31.69, 29.4, 28.7, 28.49, 25.97, 19.61, 18.65, 17.95, 17.65, 17.8, 18.26, 19.43, 25.88, 19.35, 19.81, 21.46, 19.16])  # in $/MWhI
     gCost = 10000*np.ones((n,pointsInTime))
     
     # create load helper method
-    help_obj = loadHelper(initfreq = 'H', finalFreq = freq, price=True)
+    help_obj = loadHelper(initfreq='h', finalFreq=freq, price=True)
     
-    cost_wednesday = pd.Series(tcost.values[225,1:-1]) # 2018-08-14
+    # cost_wednesday = pd.Series(tcost.values[225,1:-1]) # 2018-08-14
+    cost_wednesday = pd.Series(tcost) # 2018-08-14
     # call method for processing series
     cost_wednesday = help_obj.process_pdSeries(cost_wednesday)
     cost_wednesday = np.squeeze(cost_wednesday.values * 1e-3) # $/MWh -> $/kWh
@@ -124,7 +126,7 @@ def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1b
     gCost[PVnodes] = 0.1*cost_wednesday#*np.mean(cost_wednesday)
     
     # create load helper method
-    help_obj = loadHelper(initfreq = 'H', finalFreq = freq)
+    help_obj = loadHelper(initfreq = 'h', finalFreq = freq)
     
     # Estimate a PV Profile
     np.random.seed(2022)

@@ -76,8 +76,9 @@ class LP_dispatch:
             Aeq, A = self.__addStorage_A(Aeq, A)
             # modify beq, lb, ub, f                beq, lb, ub, f
             beq, lb, ub, f= self.__addStorage_rest(beq, lb, ub, f)
-            lb = lb.tolist()
-            ub = ub.tolist()
+
+        lb = lb[0].tolist()
+        ub = ub[0].tolist()
             
         # compute linear program optimization
         x, m, LMP = self.__linprog(f, Aeq, beq, A, b, lb, ub)
