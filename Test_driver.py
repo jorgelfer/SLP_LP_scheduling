@@ -23,7 +23,7 @@ from functools import reduce
 import json
 
 ext = '.png'
-dispatch = 'SLP'
+dispatch = 'LP'
 metric = np.inf# 1,2,np.inf
 plot = False 
 h = 6 
@@ -75,6 +75,7 @@ f = open(json_path)
 # returns JSON object as 
 # a dictionary
 qsts = json.load(f)
+time_vec = qsts["time"]
 PointsInTime = len(qsts["time"])
 outDSS = dict()
 
@@ -101,7 +102,7 @@ for load in qsts["load"]:
 
 dfDemand = pd.DataFrame(np.stack([pdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
 dfDemandQ = pd.DataFrame(np.stack([qdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
-loadNames = pd.DataFrame.from_dict(ldict, orient='index')
+loadNames = pd.Series(ldict)
 outDSS['initDemand'] = dfDemand
 outDSS['initDemandQ'] = dfDemandQ
 outDSS['loadNames'] = loadNames
@@ -263,15 +264,15 @@ for ba, batSize in enumerate(batSizes):
         ####################################
         demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, outDSS=outDSS, plot=plot, freq="h", dispatchType=dispatch)
 
-#         # save initial LMP
-#         plt.clf()
-#         fig, ax = plt.subplots(figsize=(h,w))
-#         LMP.T.plot(legend=False)
-#         ax.set_title(title)
-#         fig.tight_layout()
-#         output_img = os.path.join(DIR, title)
-#         plt.savefig(output_img)
-#         plt.close('all')
+        # save initial LMP
+        plt.clf()
+        fig, ax = plt.subplots(figsize=(h,w))
+        LMP.T.plot(legend=False)
+        ax.set_title(title)
+        fig.tight_layout()
+        output_img = os.path.join(DIR, title + ext)
+        plt.savefig(output_img)
+        plt.close('all')
         
         # LMP = LMP.iloc[3:,:] # remove first 3 rows
                 
