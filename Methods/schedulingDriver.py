@@ -89,7 +89,7 @@ def load_generationCosts(script_path, n, pointsInTime, freq):
     gCost = 10000*np.ones((n,pointsInTime))
     
     # create load helper method
-    help_obj = loadHelper(initfreq = 'H', finalFreq = freq, price=True)
+    help_obj = loadHelper(initfreq = 'h', finalFreq = freq, price=True)
     
     cost_wednesday = pd.Series(tcost.values[225,1:-1]) # 2018-08-14
     # call method for processing series
@@ -124,7 +124,7 @@ def create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1b
     gCost[PVnodes] = 0.1*cost_wednesday#*np.mean(cost_wednesday)
     
     # create load helper method
-    help_obj = loadHelper(initfreq = 'H', finalFreq = freq)
+    help_obj = loadHelper(initfreq = 'h', finalFreq = freq)
     
     # Estimate a PV Profile
     np.random.seed(2022)
@@ -322,7 +322,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     else:
         dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
         x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0)
-    
+
+    print('Obj: %g' % m.objVal) 
     #Create plot object
     plot_obj = plottingDispatch(output_dir, iterName, pointsInTime, script_path, vmin, vmin, PTDF=PTDF, dispatchType=dispatchType)
     
