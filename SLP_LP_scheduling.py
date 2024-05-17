@@ -30,7 +30,7 @@ def save_ES(script_path, outGen, outDR, outPsc, outPsd):
     outES['Pdis'] = outPsd
     return outES
 
-def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemandP=None, userDemandQ=None, plot=False, freq="15min", dispatchType='SLP'):
+def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, outDSS, plot=False, freq="15min", dispatchType='SLP'):
 
     # # execute the DSS model
     script_path = os.path.dirname(os.path.abspath(__file__))
@@ -63,15 +63,10 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemandP=None,
     # get init load
     loadNames, dfDemand, dfDemandQ = getInitDemand(script_path, dss, freq)
     
-    # correct native load by user demand
-    if userDemandP is not None:
-        dfDemand = userDemandP
-        dfDemandQ = userDemandQ
-        
     #Dss driver function
     Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, plot=plot)
 
-    outDSS = dict()
+    # outDSS = dict()
     outDSS['initPower'] = Pg_0
     outDSS['initVolts'] = v_0
     outDSS['initPjks'] = Pjk_0

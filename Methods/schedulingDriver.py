@@ -248,9 +248,9 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     pointsInTime = v_0.shape[1]
     
     # reshape base voltage:
-    v_basei = v_base.to_frame()
-    v_base = np.kron(v_basei, np.ones((1,pointsInTime)))
-    v_base = pd.DataFrame(v_base, index=v_basei.index, columns=v_0.columns)
+    # v_basei = v_base.to_frame()
+    # v_base = np.kron(v_basei, np.ones((1,pointsInTime)))
+    # v_base = pd.DataFrame(v_base, index=v_basei.index, columns=v_0.columns)
 
     # violatingVolts = compute_violatingVolts(v_0, v_base, vmin, vmax)
 
