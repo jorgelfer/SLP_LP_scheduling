@@ -8,6 +8,7 @@ Created on Mon Mar  7 17:07:32 2022
 #########################################################################
 from SLP_LP_scheduling import SLP_LP_scheduling
 from Methods.smartCharging_driver import smartCharging_driver 
+import py_dss_interface
 import pandas as pd
 import numpy as np
 import os
@@ -18,16 +19,55 @@ import time
 import seaborn as sns
 import shutil
 from functools import reduce
+import json
 
 ext = '.png'
 dispatch = 'LP'
 metric = np.inf# 1,2,np.inf
-plot = True 
+plot = False 
 h = 6 
 w = 4 
 
+# define DSS path
+dataset = "IEEETestCases"
+NetworkModel = "123Bus_wye" # "SecondaryTestCircuit_modified", "13Bus", "123Bus", "case3", "4Bus-DY-Bal"
+InFile1 = "IEEE123Master.dss" # "Master.DSS", "IEEE13Nodeckt.dss", "IEEE123Master.dss", "case3_unbalanced.dss", "4Bus-DY-Bal.dss"
+
 # script_path = os.path.dirname(os.path.abspath(__file__))
-script_path = os.getcwd()
+DIR = os.getcwd()
+
+# Opening JSON file
+json_path = os.path.join(DIR, "..", dataset, NetworkModel, "qsts.json")
+f = open(json_path)
+ 
+# returns JSON object as 
+# a dictionary
+qsts = json.load(f)
+PointsInTime = len(qsts["time"])
+
+####
+# preprocess load
+###
+nodes = qsts["dpdp"]["nodes"]
+pdict = {key: np.zeros(PointsInTime) for key in nodes}
+qdict = {key: np.zeros(PointsInTime) for key in nodes}
+for load in qsts["load"]:
+
+    # get load bus uid
+    bus = load["bus"] 
+
+    # get load phases
+    phases = load["phases"]
+
+    # load power 
+    for ph in phases:
+        pdict[bus + f".{ph}"] = np.asarray(load["p"][f"{ph}"]) 
+        qdict[bus + f".{ph}"] = np.asarray(load["q"][f"{ph}"]) 
+
+# demandP = pd.DataFrame(np.stack([pdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
+# demandQ = pd.DataFrame(np.stack([qdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
+demandP = None
+demandQ = None
 
 # output directory
 # time stamp 
@@ -36,24 +76,25 @@ timestamp = time.strftime('%b-%d-%Y_%H%M', t)
 # create directory to store results
 today = time.strftime('%b-%d-%Y', t)
 directory = "Results2_" + today
-output_dir12 = pathlib.Path(script_path).joinpath("outputs", directory)
+
+output_dir12 = os.path.join(DIR, "outputs", directory)
 
 if not os.path.isdir(output_dir12):
     os.mkdir(output_dir12)
 
-output_dir13 = pathlib.Path(output_dir12).joinpath(dispatch)
+output_dir13 = os.path.join(output_dir12, dispatch)
 if not os.path.isdir(output_dir13):
     os.mkdir(output_dir13)
     
-output_dir14 = pathlib.Path(output_dir13).joinpath(f"L_{metric}")
+output_dir14 = os.path.join(output_dir13, f"L_{metric}")
 if not os.path.isdir(output_dir14):
     os.mkdir(output_dir14)
 else:
     shutil.rmtree(output_dir14)
     os.mkdir(output_dir14)
 
-batSizes = [0]
-pvSizes = [0]
+batSizes = [0, 100]
+pvSizes = [0, 100]
 
 # voltage limits
 vmin = 0.95
@@ -66,19 +107,21 @@ for ba, batSize in enumerate(batSizes):
         if not os.path.isdir(output_dir1):
             os.mkdir(output_dir1)
             
+        title = f"init_LMP_dispatch_{dispatch}_bat_{batSize}_pv_{pvSize}"
+        print(title)
+
         ####################################
         # First thing: compute the initial Dispatch
         ####################################
-        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemand=None, plot=plot, freq="30min", dispatchType=dispatch)
+        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemandP=demandP, userDemandQ=demandQ, plot=plot, freq="h", dispatchType=dispatch)
 
         # save initial LMP
         plt.clf()
         fig, ax = plt.subplots(figsize=(h,w))
         LMP.T.plot(legend=False)
-        title = f"init_LMP_dispatch_{dispatch}_bat_{batSize}_pv_{pvSize}"
         ax.set_title(title)
         fig.tight_layout()
-        output_img = pathlib.Path(script_path).joinpath(title)
+        output_img = os.path.join(DIR, title)
         plt.savefig(output_img)
         plt.close('all')
         

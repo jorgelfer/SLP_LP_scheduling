@@ -60,7 +60,7 @@ def create_battery(PTDF, pointsInTime, sbus='83', batSize=300):
     BatInitEnergy = BatSizes * np.random.uniform(0.5, 0.8, size=(1,numBatteries)) 
     
     batt['BatInitEnergy'] = BatInitEnergy
-    Pbatcost = 0.01
+    Pbatcost = 0.0
     batt['Pbatcost'] = Pbatcost
     ccharbat = Pbatcost * np.ones((1,2*numBatteries*pointsInTime))
     batt['ccharbat'] = ccharbat
@@ -183,13 +183,13 @@ def load_voltageSensitivity(script_path, case):
 def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
     '''function to load line Limits'''
 
-    if DR == True:
-        Lmax_file = pathlib.Path(script_path).joinpath("inputs", case, "Pjk_ratings.pkl") #high limits: Pjk_ratings_Nov-11-2021_1745 ## low limits:Pjk_ratings_Nov-20-2021_1154
-        Lmaxi = pd.read_pickle(Lmax_file)
-    else:
+    # if DR == True:
+    #     Lmax_file = pathlib.Path(script_path).joinpath("inputs", case, "Pjk_ratings.pkl") #high limits: Pjk_ratings_Nov-11-2021_1745 ## low limits:Pjk_ratings_Nov-20-2021_1154
+    #     Lmaxi = pd.read_pickle(Lmax_file)
+    # else:
 
-        #debug:
-        Lmaxi = 2000 * np.ones((len(PTDF),1))
+    #debug:
+    Lmaxi = 2000 * np.ones((len(PTDF),1))
         
     # expand tempolar equations
     Lmax = np.kron(Lmaxi, np.ones((1,pointsInTime)))
@@ -200,8 +200,9 @@ def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
     violatingLines = compare.any(axis=1)
     
     # Line Info
-    Linfo_file = pathlib.Path(script_path).joinpath("inputs", case, "LineInfo.pkl")
-    Linfo = pd.read_pickle(Linfo_file)
+    # Linfo_file = pathlib.Path(script_path).joinpath("inputs", case, "LineInfo.pkl")
+    # Linfo = pd.read_pickle(Linfo_file)
+    Linfo = None
 
     return violatingLines, Lmax, Linfo
 

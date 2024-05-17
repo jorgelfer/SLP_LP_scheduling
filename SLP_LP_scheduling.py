@@ -41,20 +41,21 @@ def save_ES(script_path, outGen, outDR, outPsc, outPsd):
     outES['Pdis'] = outPsd
     return outES
 
-def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemand=None, plot=False, freq="15min", dispatchType='SLP'):
+def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemandP=None, userDemandQ=None, plot=False, freq="15min", dispatchType='SLP'):
 
-    # execute the DSS model
+    # # execute the DSS model
     script_path = os.path.dirname(os.path.abspath(__file__))
-    dss_file = pathlib.Path(script_path).joinpath("EV_data", "123bus", "IEEE123Master.dss")
+    # dss_file = pathlib.Path(script_path).joinpath("EV_data", "123bus", "IEEE123Master.dss")
+    dss_file = r"C:\Users\jfernandez87\GitHub\IEEETestCases\123Bus_wye\IEEE123Master.dss"
     
     dss = py_dss_interface.DSSDLL()
     dss.text(f"Compile [{dss_file}]")
     
     # initialization
-    case = '123bus'
+    case = '123bus_wye'
     
     #compute sensitivities for the test case
-    compute = False
+    compute = False 
     if compute:
         computeSensitivity(script_path, case, dss, dss_file, plot)
     
@@ -62,8 +63,9 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemand=None, 
     loadNames, dfDemand, dfDemandQ = getInitDemand(script_path, dss, freq)
     
     # correct native load by user demand
-    if userDemand is not None:
-        dfDemand.loc[loadNames.index,:] = userDemand
+    if userDemandP is not None:
+        dfDemand = userDemandP
+        dfDemandQ = userDemandQ
         
     #Dss driver function
     Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, plot=plot)

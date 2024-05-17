@@ -55,7 +55,7 @@ def computeSensitivity(script_path, case, dss, dss_file, plot):
         sen_obj = sensitivityPy(dss, time=0)
 
         # Perturb DSS with small gen 
-        sen_obj.perturbDSS(node, kv=nodeBaseVoltage[node], kw=10) # 10 kw
+        sen_obj.perturbDSS(node, kv=nodeBaseVoltage[node], kw=10, P=True) # 10 kw
         
         dss.text("solve")
 
