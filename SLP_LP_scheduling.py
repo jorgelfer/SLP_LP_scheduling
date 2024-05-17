@@ -80,7 +80,7 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemandP=None,
     outDSS['initDemand'] = dfDemand
     outDSS['initDemandQ'] = dfDemandQ
     outDSS['PTDF'] = PTDF
-    outDSS['dvdp'] = PTDF
+    outDSS['dvdp'] = dfVS
 
 
     # # reactive power correction

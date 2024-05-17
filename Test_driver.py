@@ -23,7 +23,7 @@ from functools import reduce
 import json
 
 ext = '.png'
-dispatch = 'SLP'
+dispatch = 'LP'
 metric = np.inf# 1,2,np.inf
 plot = False 
 h = 6 
@@ -261,7 +261,7 @@ for ba, batSize in enumerate(batSizes):
         ####################################
         # First thing: compute the initial Dispatch
         ####################################
-        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemandP=dfDemand, userDemandQ=dfDemandQ, plot=plot, freq="h", dispatchType=dispatch)
+        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemandP=None, userDemandQ=None, plot=plot, freq="h", dispatchType=dispatch)
 
 #         # save initial LMP
 #         plt.clf()
