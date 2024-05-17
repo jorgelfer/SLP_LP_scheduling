@@ -20,7 +20,7 @@ import shutil
 from functools import reduce
 
 ext = '.png'
-dispatch = 'SLP'
+dispatch = 'LP'
 metric = np.inf# 1,2,np.inf
 plot = True 
 h = 6 
@@ -75,9 +75,10 @@ for ba, batSize in enumerate(batSizes):
         plt.clf()
         fig, ax = plt.subplots(figsize=(h,w))
         LMP.T.plot(legend=False)
-        ax.set_title(f"init_LMP - bat:{batSize}_pv:{pvSize}")
+        title = f"init_LMP_dispatch_{dispatch}_bat_{batSize}_pv_{pvSize}"
+        ax.set_title(title)
         fig.tight_layout()
-        output_img = pathlib.Path(script_path).joinpath(f"init_LMP_bat_{batSize}_pv_{pvSize}"+ ext)
+        output_img = pathlib.Path(script_path).joinpath(title)
         plt.savefig(output_img)
         plt.close('all')
         

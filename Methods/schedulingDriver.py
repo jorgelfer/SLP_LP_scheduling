@@ -269,7 +269,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     PTDF = PTDF.round()
     
     # Line costs
-    pijCost = 0.01*np.ones((l,pointsInTime))
+    pijCost = 0.0*np.ones((l,pointsInTime))
     clin = np.reshape(pijCost.T, (1,pijCost.size), order="F")
     
     ## Generation settings
