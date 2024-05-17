@@ -93,8 +93,8 @@ else:
     shutil.rmtree(output_dir14)
     os.mkdir(output_dir14)
 
-batSizes = [0, 100]
-pvSizes = [0, 100]
+batSizes = [0]
+pvSizes = [0]
 
 # voltage limits
 vmin = 0.95
