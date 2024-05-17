@@ -10,6 +10,7 @@ import os
 
 import py_dss_interface
 import numpy as np
+import pandas as pd
 from Methods.dssDriver import dssDriver
 from Methods.schedulingDriver import schedulingDriver
 from Methods.initDemandProfile import getInitDemand 
@@ -19,18 +20,6 @@ from Methods.reactiveCorrection import reactiveCorrection
 #required for plotting
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 20})
-
-def save_initDSS(script_path, Pg_0, v_0, Pjk_0, v_base, loadNames, initDemand, initDemandQ):
-    # save initial DSS values
-    outDSS = dict()
-    outDSS['initPower'] = Pg_0
-    outDSS['initVolts'] = v_0
-    outDSS['initPjks'] = Pjk_0
-    outDSS['nodeBaseVolts'] = v_base 
-    outDSS['loadNames'] = loadNames
-    outDSS['initDemand'] = initDemand
-    outDSS['initDemandQ'] = initDemandQ
-    return outDSS
 
 def save_ES(script_path, outGen, outDR, outPsc, outPsd):
     # save optimization values
@@ -59,6 +48,18 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemandP=None,
     if compute:
         computeSensitivity(script_path, case, dss, dss_file, plot)
     
+    # load PTDF
+    PTDF_file = os.path.join(script_path, "inputs", case,"PTDF_jk.pkl")
+    PTDF = pd.read_pickle(PTDF_file)
+    PTDF = PTDF / 10 # divide by perturbation injection value
+
+    # voltage sensitivity
+    dfVS_file = os.path.join(script_path, "inputs", case, "VoltageSensitivity.pkl")
+    dfVS = pd.read_pickle(dfVS_file)
+    dfVS = dfVS / 10 # divide by perturbation injection value
+
+    # load dvdp
+
     # get init load
     loadNames, dfDemand, dfDemandQ = getInitDemand(script_path, dss, freq)
     
@@ -69,7 +70,18 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, userDemandP=None,
         
     #Dss driver function
     Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, plot=plot)
-    outDSS = save_initDSS(script_path, Pg_0, v_0, Pjk_0, v_base, loadNames, dfDemand, dfDemandQ)
+
+    outDSS = dict()
+    outDSS['initPower'] = Pg_0
+    outDSS['initVolts'] = v_0
+    outDSS['initPjks'] = Pjk_0
+    outDSS['nodeBaseVolts'] = v_base 
+    outDSS['loadNames'] = loadNames
+    outDSS['initDemand'] = dfDemand
+    outDSS['initDemandQ'] = dfDemandQ
+    outDSS['PTDF'] = PTDF
+    outDSS['dvdp'] = PTDF
+
 
     # # reactive power correction
     # Q_obj = reactiveCorrection(dss) 

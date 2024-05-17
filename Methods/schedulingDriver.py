@@ -252,10 +252,11 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     v_base = np.kron(v_basei, np.ones((1,pointsInTime)))
     v_base = pd.DataFrame(v_base, index=v_basei.index, columns=v_0.columns)
 
-    violatingVolts = compute_violatingVolts(v_0, v_base, vmin, vmax)
+    # violatingVolts = compute_violatingVolts(v_0, v_base, vmin, vmax)
 
     # load PTDF results
-    PTDF = load_PTDF(script_path, case)
+    # PTDF = load_PTDF(script_path, case)
+    PTDF = outDSS['PTDF']
     n = len(PTDF.columns)
     l = len(PTDF)
         
@@ -278,7 +279,6 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     gCost, cost_wednesday = load_generationCosts(script_path, n, pointsInTime, freq)
     subCost = pd.DataFrame(gCost[0:3,:], index=PTDF.columns[0:3], columns=v_0.columns)
 
-       
     # Define generation limits
     Gmax = np.zeros((n,1))
     Gmax[0,0] = 2000 # asume the slack conventional phase is here
@@ -288,6 +288,7 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     
     # Line limits and info          
     violatingLines, Pjk_lim, Linfo = load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pjk_0) 
+    # Pjk_lim = outDSS['Pjk_lim']
     
     #Demand Response (cost of shedding load)
     np.random.seed(2022) # Set random seed so results are repeatable
@@ -313,7 +314,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     cgn = np.reshape(gCost.T, (1,gCost.size), order="F")
     
     # load voltage base at each node
-    dvdp = load_voltageSensitivity(script_path, case)
+    # dvdp = load_voltageSensitivity(script_path, case)
+    dvdp = outDSS['dvdp']
 
     # call the OPF method
     if dispatchType == 'SLP':

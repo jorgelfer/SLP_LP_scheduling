@@ -7,6 +7,7 @@ Created on Mon Mar  7 17:07:32 2022
 """
 #########################################################################
 from SLP_LP_scheduling import SLP_LP_scheduling
+from Methods.schedulingDriver import schedulingDriver
 from Methods.smartCharging_driver import smartCharging_driver 
 import py_dss_interface
 import pandas as pd
@@ -22,52 +23,14 @@ from functools import reduce
 import json
 
 ext = '.png'
-dispatch = 'LP'
+dispatch = 'SLP'
 metric = np.inf# 1,2,np.inf
 plot = False 
 h = 6 
 w = 4 
 
-# define DSS path
-dataset = "IEEETestCases"
-NetworkModel = "123Bus_wye" # "SecondaryTestCircuit_modified", "13Bus", "123Bus", "case3", "4Bus-DY-Bal"
-InFile1 = "IEEE123Master.dss" # "Master.DSS", "IEEE13Nodeckt.dss", "IEEE123Master.dss", "case3_unbalanced.dss", "4Bus-DY-Bal.dss"
-
 # script_path = os.path.dirname(os.path.abspath(__file__))
 DIR = os.getcwd()
-
-# Opening JSON file
-json_path = os.path.join(DIR, "..", dataset, NetworkModel, "qsts.json")
-f = open(json_path)
- 
-# returns JSON object as 
-# a dictionary
-qsts = json.load(f)
-PointsInTime = len(qsts["time"])
-
-####
-# preprocess load
-###
-nodes = qsts["dpdp"]["nodes"]
-pdict = {key: np.zeros(PointsInTime) for key in nodes}
-qdict = {key: np.zeros(PointsInTime) for key in nodes}
-for load in qsts["load"]:
-
-    # get load bus uid
-    bus = load["bus"] 
-
-    # get load phases
-    phases = load["phases"]
-
-    # load power 
-    for ph in phases:
-        pdict[bus + f".{ph}"] = np.asarray(load["p"][f"{ph}"]) 
-        qdict[bus + f".{ph}"] = np.asarray(load["q"][f"{ph}"]) 
-
-# demandP = pd.DataFrame(np.stack([pdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
-# demandQ = pd.DataFrame(np.stack([qdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
-demandP = None
-demandQ = None
 
 # output directory
 # time stamp 
@@ -93,12 +56,197 @@ else:
     shutil.rmtree(output_dir14)
     os.mkdir(output_dir14)
 
-batSizes = [0, 100]
-pvSizes = [0, 100]
+batSizes = [0]
+pvSizes = [0]
 
 # voltage limits
 vmin = 0.95
 vmax = 1.05
+
+# define DSS path
+dataset = "IEEETestCases"
+NetworkModel = "123Bus_wye" # "SecondaryTestCircuit_modified", "13Bus", "123Bus", "case3", "4Bus-DY-Bal"
+InFile1 = "IEEE123Master.dss" # "Master.DSS", "IEEE13Nodeckt.dss", "IEEE123Master.dss", "case3_unbalanced.dss", "4Bus-DY-Bal.dss"
+
+# Opening JSON file
+json_path = os.path.join(DIR, "..", dataset, NetworkModel, "qsts.json")
+f = open(json_path)
+ 
+# returns JSON object as 
+# a dictionary
+qsts = json.load(f)
+PointsInTime = len(qsts["time"])
+outDSS = dict()
+
+####
+# preprocess load
+###
+nodes = qsts["dpdp"]["nodes"]
+pdict = {key: np.zeros(PointsInTime) for key in nodes}
+qdict = {key: np.zeros(PointsInTime) for key in nodes}
+ldict = {}
+for load in qsts["load"]:
+
+    # get load bus uid
+    bus = load["bus"] 
+
+    # get load phases
+    phases = load["phases"]
+
+    # load power 
+    for ph in phases:
+        pdict[bus + f".{ph}"] = np.asarray(load["p"][f"{ph}"]) 
+        qdict[bus + f".{ph}"] = np.asarray(load["q"][f"{ph}"]) 
+        ldict[bus + f".{ph}"] = load["uid"]
+
+dfDemand = pd.DataFrame(np.stack([pdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
+dfDemandQ = pd.DataFrame(np.stack([qdict[n] for n in nodes]), index = np.asarray(nodes)) # in kW
+loadNames = pd.DataFrame.from_dict(ldict, orient='index')
+outDSS['initDemand'] = dfDemand
+outDSS['initDemandQ'] = dfDemandQ
+outDSS['loadNames'] = loadNames
+
+####
+# preprocess initial flows 
+####
+bpns = qsts["dpdp"]["bpns"]
+fdict = {key: np.zeros(PointsInTime) for key in bpns}
+for br in qsts["branch"]:
+    # get branch uid
+    uid = br["uid"].split(".")[1]
+
+    # for each flow
+    for ph in br["phases"]:
+        lenp = len(br["p_nm"][f"{ph}"])
+        fdict[uid + f".{ph}"] = np.asarray(br["p_nm"][f"{ph}"])
+Pjk_0 = pd.DataFrame(np.stack([fdict[n] for n in bpns]), index = np.asarray(bpns))
+outDSS['initPjks'] = Pjk_0
+
+
+####
+# preprocess initial voltages magnitutes
+####
+nodes = qsts["dpdp"]["nodes"]
+vdict = {key: np.zeros(PointsInTime) for key in nodes}
+for bus in qsts["bus"]:
+
+    # get load bus uid
+    uid = bus["uid"] 
+
+    # get load phases
+    phases = bus["phases"]
+
+    # load power 
+    for ph in phases:
+        vdict[uid + f".{ph}"] = np.asarray(bus["vm"][f"{ph}"])
+Vm_0 = pd.DataFrame(np.stack([vdict[n] for n in nodes]), index = np.asarray(nodes))
+outDSS['initVolts'] = Vm_0
+
+
+####
+# initial generation
+####
+nodes = qsts["dpdp"]["nodes"]
+gdict = {key: np.zeros(PointsInTime) for key in nodes}
+for vs in qsts["vsource"]:
+
+    # get load bus uid
+    uid = vs["bus"] 
+
+    # get load phases
+    phases = vs["phases"]
+
+    # load power 
+    for ph in phases:
+        gdict[uid + f".{ph}"] = np.asarray(vs["p"][f"{ph}"])
+
+Pg_0 = pd.DataFrame(np.stack([gdict[n] for n in nodes]), index = np.asarray(nodes))
+outDSS['initPower'] = Pg_0
+
+
+####
+# preprocess voltage base for each node
+####
+nodes = qsts["dpdp"]["nodes"]
+vdict = {key: 0.0 for key in nodes}
+for bus in qsts["bus"]:
+    # get bus uid
+    uid = bus["uid"]
+
+    # get load phases
+    phases = bus["phases"]
+
+    # load power 
+    for ph in phases:
+        vdict[uid + f".{ph}"] = bus["kV_base"]
+
+v_basei = pd.DataFrame(np.asarray([vdict[n] for n in nodes]), index = np.asarray(nodes))
+v_base = np.kron(v_basei, np.ones((1, PointsInTime)))
+v_base = pd.DataFrame(v_base, index=v_basei.index)
+outDSS['nodeBaseVolts'] = v_base 
+
+
+####
+# preprocess PTDF
+###
+# row length
+rl = len(qsts["dpdp"]["bpns"])
+
+# column length
+cl = len(qsts["dpdp"]["nodes"])
+
+# reshape flatten array
+PTDF = np.reshape(qsts["dpdp"]["matrix_ij"], (rl, cl), order='F')
+PTDF = pd.DataFrame(PTDF, columns=qsts["dpdp"]["nodes"], index=qsts["dpdp"]["lns"])
+outDSS['PTDF'] = PTDF
+
+
+####
+# preprocess voltage sensitivity
+####
+# row and columng length
+rcl = len(qsts["dvdp"]["nodes"])
+
+# reshape flatten array
+dvdp = np.reshape(qsts["dvdp"]["matrix"], (rcl, rcl), order='F')
+dvdp = pd.DataFrame(dvdp, columns=qsts["dvdp"]["nodes"], index=qsts["dvdp"]["nodes"])
+outDSS['dvdp'] = dvdp
+
+####
+# preprocess branches
+####
+
+# line costs
+Pijcost = 0.0 * np.zeros((len(PTDF), PointsInTime))
+clin = np.reshape(Pijcost.T, (1,Pijcost.size), order="F")
+
+# define line limits
+bpns = qsts["dpdp"]["bpns"]
+ldict = {key: 0.0 for key in bpns}
+
+for br in qsts["branch"]:
+    # get branch uid
+    uid = br["uid"].split(".")[1]
+
+    # assign normal flow limit (already comes by phase in kW)
+    normal_flow_limit = br["normal_flow_limit"] # in kVA
+
+    for ph in br["phases"]:
+        ldict[uid + f".{ph}"] = normal_flow_limit
+
+# Lmaxi = pd.DataFrame(np.asarray([ldict[n] for n in bpns]), np.asarray(bpns))
+Lmaxi = 2000 * np.ones((len(PTDF),1))
+Lmax = np.kron(Lmaxi, np.ones((1,PointsInTime)))
+Lmax = pd.DataFrame(Lmax, index=np.asarray(bpns))
+outDSS['Pjk_lim'] = Lmax
+
+# # optimization
+# for ba, batSize in enumerate(batSizes): 
+#     for pv, pvSize in enumerate(pvSizes):
+#         #Energy scheduling driver function   
+#         outGen, outDR, outPchar, outPdis, outLMP, costPdr, cgn, mobj = schedulingDriver(batSize, pvSize, DIR, 'Dispatch', 'h', DIR, InFile1, outDSS, dispatch, vmin, vmax, plot=plot)
+#         # outES = save_ES(script_path, outGen, outDR, outPchar, outPdis)
+
 
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
@@ -113,17 +261,17 @@ for ba, batSize in enumerate(batSizes):
         ####################################
         # First thing: compute the initial Dispatch
         ####################################
-        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemandP=demandP, userDemandQ=demandQ, plot=plot, freq="h", dispatchType=dispatch)
+        demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, userDemandP=dfDemand, userDemandQ=dfDemandQ, plot=plot, freq="h", dispatchType=dispatch)
 
-        # save initial LMP
-        plt.clf()
-        fig, ax = plt.subplots(figsize=(h,w))
-        LMP.T.plot(legend=False)
-        ax.set_title(title)
-        fig.tight_layout()
-        output_img = os.path.join(DIR, title)
-        plt.savefig(output_img)
-        plt.close('all')
+#         # save initial LMP
+#         plt.clf()
+#         fig, ax = plt.subplots(figsize=(h,w))
+#         LMP.T.plot(legend=False)
+#         ax.set_title(title)
+#         fig.tight_layout()
+#         output_img = os.path.join(DIR, title)
+#         plt.savefig(output_img)
+#         plt.close('all')
         
         # LMP = LMP.iloc[3:,:] # remove first 3 rows
                 

@@ -138,6 +138,11 @@ def dssDriver(output_dir, iterName, scriptPath, case, dss, dssFile, loadNames, d
     dfQ = pd.DataFrame(q, np.asarray(nodeNames), columns=dfDemand.columns)
     dfPjks = pd.DataFrame(pjk, index=np.asarray(nodeLineNames), columns=dfDemand.columns)
 
+    # process v_base
+    # v_basei = nodeBaseVoltage.to_frame()
+    # v_base = np.kron(v_basei, np.ones((1,pointsInTime)))
+    # v_base = pd.DataFrame(v_base, index=v_basei.index, columns=dfDemand.columns)
+
     if plot:
         #plot results
         plot_obj = plottingDispatch(output_dir, iterName, pointsInTime, scriptPath, vmin, vmax, dispatchType=dispatchType)
