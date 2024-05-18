@@ -220,7 +220,7 @@ def compute_violatingVolts(v_0, v_base, vmin, vmax):
 # define the type of analysis;
 
     
-def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin, vmax, PF=True, voltage=True, DR=True, plot=False):
+def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin, vmax, PF=False, voltage=True, DR=True, plot=False):
     
     # define Storage and PV
     if batSize == 0:
@@ -247,13 +247,6 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     PDR_0 = pd.DataFrame(np.zeros(v_0.shape), index=Pg_0.index, columns=Pg_0.columns)
     pointsInTime = v_0.shape[1]
     
-    # reshape base voltage:
-    # v_basei = v_base.to_frame()
-    # v_base = np.kron(v_basei, np.ones((1,pointsInTime)))
-    # v_base = pd.DataFrame(v_base, index=v_basei.index, columns=v_0.columns)
-
-    # violatingVolts = compute_violatingVolts(v_0, v_base, vmin, vmax)
-
     # load PTDF results
     # PTDF = load_PTDF(script_path, case)
     PTDF = outDSS['PTDF']
@@ -266,6 +259,9 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     #Penalty factors
     if PF:
         batt, pf, Snodes = compute_penaltyFactors(batt, PTDF)
+    else:
+        pf = pd.Series(np.ones(n), index=PTDF.columns)
+        Snodes = np.where(np.any(batt["BatIncidence"],1))[0]
         
     # round the PTDF to make the optimization work
     PTDF = PTDF.round()
@@ -287,8 +283,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     ##
     
     # Line limits and info          
-    violatingLines, Pjk_lim, Linfo = load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pjk_0) 
-    # Pjk_lim = outDSS['Pjk_lim']
+    # violatingLines, Pjk_lim, Linfo = load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pjk_0) 
+    Pjk_lim = outDSS['Pjk_lim']
     
     #Demand Response (cost of shedding load)
     np.random.seed(2022) # Set random seed so results are repeatable

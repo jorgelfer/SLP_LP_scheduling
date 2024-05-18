@@ -53,6 +53,8 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, outDSS, plot=Fals
     PTDF = pd.read_pickle(PTDF_file)
     PTDF = PTDF / 10 # divide by perturbation injection value
 
+    # assert np.all(PTDF.round() == outDSS["PTDF"].round()), "PTDF values do not match"
+
     # voltage sensitivity
     dfVS_file = os.path.join(script_path, "inputs", case, "VoltageSensitivity.pkl")
     dfVS = pd.read_pickle(dfVS_file)
@@ -78,7 +80,7 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, outDSS, plot=Fals
     outDSS['initDemand'] = dfDemand
     outDSS['initDemandQ'] = dfDemandQ
     outDSS['PTDF'] = PTDF
-    # outDSS['dvdp'] = dfVS
+    outDSS['dvdp'] = dfVS
 
 
     # # reactive power correction
