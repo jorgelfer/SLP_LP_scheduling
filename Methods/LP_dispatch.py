@@ -95,7 +95,7 @@ class LP_dispatch:
 
         for i in range(self.n): # node loop
             for j in range(self.l): # lines loop
-                if PTDF.columns[i] == PTDF.index[j].split("-")[0][1:]:
+                if PTDF.columns[i] == PTDF.index[j].split("-")[0]:
                     Node2Line[i,j] = 1
                 elif PTDF.columns[i] == PTDF.index[j].split("-")[1]:
                     Node2Line[i,j] = -1

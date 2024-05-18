@@ -107,7 +107,7 @@ class sensitivityPy:
                 nodes = np.asarray(nodes).reshape((int(len(nodes)/2),-1),order="F")                
                 
                 for t1n, t2n in zip(nodes[:,0],nodes[:,1]):
-                    lname.append("L"+ buses[0].split(".")[0] + f".{t1n}" + "-" + buses[1].split(".")[0] + f".{t1n}")
+                    lname.append(buses[0].split(".")[0] + f".{t1n}" + "-" + buses[1].split(".")[0] + f".{t1n}")
     
             elif "Transformer" in elem:
                 
@@ -119,7 +119,7 @@ class sensitivityPy:
                 nodes = np.asarray(nodes).reshape((int(len(nodes)/2),-1),order="F")
             
                 for t1n, t2n in zip(nodes[:,0],nodes[:,1]):
-                    lname.append("T"+ buses[0].split(".")[0] + f".{t1n}" + "-" + buses[1].split(".")[0] + f".{t1n}")
+                    lname.append(buses[0].split(".")[0] + f".{t1n}" + "-" + buses[1].split(".")[0] + f".{t1n}")
     
         return lname
     

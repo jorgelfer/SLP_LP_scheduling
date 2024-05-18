@@ -23,7 +23,7 @@ from functools import reduce
 import json
 
 ext = '.png'
-dispatch = 'LP'
+dispatch = 'SLP'
 metric = np.inf# 1,2,np.inf
 plot = False 
 h = 6 

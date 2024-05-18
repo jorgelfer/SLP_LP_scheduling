@@ -63,24 +63,24 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, outDSS, plot=Fals
     # load dvdp
 
     # get init load
-    loadNames, dfDemand, dfDemandQ = getInitDemand(script_path, dss, freq)
-    # loadNames = outDSS['loadNames'] 
-    # dfDemand = outDSS['initDemand']
-    # dfDemandQ = outDSS['initDemandQ']
+    # loadNames, dfDemand, dfDemandQ = getInitDemand(script_path, dss, freq)
+    loadNames = outDSS['loadNames'] 
+    dfDemand = outDSS['initDemand']
+    dfDemandQ = outDSS['initDemandQ']
 
     #Dss driver function
-    Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, plot=plot)
+    # Pg_0, v_0, Pjk_0, v_base = dssDriver(output_dir, 'InitDSS', script_path, case, dss, dss_file, loadNames, dfDemand, dfDemandQ, dispatchType, vmin, vmax, plot=plot)
 
     # outDSS = dict()
-    outDSS['initPower'] = Pg_0
-    outDSS['initVolts'] = v_0
-    outDSS['initPjks'] = Pjk_0
-    outDSS['nodeBaseVolts'] = v_base 
-    outDSS['loadNames'] = loadNames
-    outDSS['initDemand'] = dfDemand
-    outDSS['initDemandQ'] = dfDemandQ
-    outDSS['PTDF'] = PTDF
-    outDSS['dvdp'] = dfVS
+    # outDSS['initPower'] = Pg_0
+    # outDSS['initVolts'] = v_0
+    # outDSS['initPjks'] = Pjk_0
+    # outDSS['nodeBaseVolts'] = v_base 
+    # outDSS['loadNames'] = loadNames
+    # outDSS['initDemand'] = dfDemand
+    # outDSS['initDemandQ'] = dfDemandQ
+    # outDSS['PTDF'] = PTDF
+    # outDSS['dvdp'] = dfVS
 
 
     # # reactive power correction

@@ -70,17 +70,6 @@ def create_battery(PTDF, pointsInTime, sbus='83', batSize=300):
 
     return batt
 
-def load_PTDF(script_path, case):
-    '''function to load PTDF'''
-
-    PTDF_file = pathlib.Path(script_path).joinpath("inputs", case,"PTDF_jk.pkl")
-    PTDF = pd.read_pickle(PTDF_file)
-    
-    # adjust lossless PTDF
-    PTDF = PTDF / 10 # divide by perturbation injection value
-    
-    return PTDF
-
 def load_generationCosts(script_path, n, pointsInTime, freq):
     '''function to load generations costs and perform interpolation'''
     
@@ -167,59 +156,6 @@ def compute_penaltyFactors(batt, PTDF):
 
     return batt, Pf, nodes
 
-def load_voltageSensitivity(script_path, case):
-    '''funtion to load voltage sensitivity'''
-    
-    # voltage sensitivity
-    dfVS_file = pathlib.Path(script_path).joinpath("inputs", case, "VoltageSensitivity.pkl")
-    dfVS = pd.read_pickle(dfVS_file)
-
-    # adjust voltage sensi matrix
-    dfVS = dfVS / 10 # divide by perturbation injection value
-    
-    return dfVS
-
-
-def load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pij):
-    '''function to load line Limits'''
-
-    # if DR == True:
-    #     Lmax_file = pathlib.Path(script_path).joinpath("inputs", case, "Pjk_ratings.pkl") #high limits: Pjk_ratings_Nov-11-2021_1745 ## low limits:Pjk_ratings_Nov-20-2021_1154
-    #     Lmaxi = pd.read_pickle(Lmax_file)
-    # else:
-
-    #debug:
-    Lmaxi = 2000 * np.ones((len(PTDF),1))
-        
-    # expand tempolar equations
-    Lmax = np.kron(Lmaxi, np.ones((1,pointsInTime)))
-    
-    # extract violating Lines
-    Lmax = pd.DataFrame(Lmax, Pij.index, Pij.columns)
-    compare = Pij > Lmax
-    violatingLines = compare.any(axis=1)
-    
-    # Line Info
-    # Linfo_file = pathlib.Path(script_path).joinpath("inputs", case, "LineInfo.pkl")
-    # Linfo = pd.read_pickle(Linfo_file)
-    Linfo = None
-
-    return violatingLines, Lmax, Linfo
-
-def compute_violatingVolts(v_0, v_base, vmin, vmax):
-
-    # extract violating Lines
-    v_lb = (vmin*1000)*v_base 
-    v_ub = (vmax*1000)*v_base
-
-    compare = (v_0 > v_ub) | (v_0 < v_lb) 
-    violatingVolts = compare.any(axis=1)
-    
-    return violatingVolts
-
-# define the type of analysis;
-
-    
 def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin, vmax, PF=False, voltage=True, DR=True, plot=False):
     
     # define Storage and PV
@@ -248,7 +184,6 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     pointsInTime = v_0.shape[1]
     
     # load PTDF results
-    # PTDF = load_PTDF(script_path, case)
     PTDF = outDSS['PTDF']
     n = len(PTDF.columns)
     l = len(PTDF)
@@ -280,10 +215,8 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     Gmax[0,0] = 2000 # asume the slack conventional phase is here
     Gmax[1,0] = 2000 # asume the slack conventional phase is here
     Gmax[2,0] = 2000 # asume the slack conventional phase is here
-    ##
     
     # Line limits and info          
-    # violatingLines, Pjk_lim, Linfo = load_lineLimits(script_path, case, PTDF, pointsInTime, DR, Pjk_0) 
     Pjk_lim = outDSS['Pjk_lim']
     
     #Demand Response (cost of shedding load)
@@ -310,7 +243,6 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     cgn = np.reshape(gCost.T, (1,gCost.size), order="F")
     
     # load voltage base at each node
-    # dvdp = load_voltageSensitivity(script_path, case)
     dvdp = outDSS['dvdp']
 
     # call the OPF method
