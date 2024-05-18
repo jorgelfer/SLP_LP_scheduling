@@ -23,7 +23,7 @@ from functools import reduce
 import json
 
 ext = '.png'
-dispatch = 'SLP'
+dispatch = 'LP'
 metric = np.inf# 1,2,np.inf
 plot = False 
 h = 6 
@@ -79,7 +79,14 @@ time_vec = qsts["time"]
 PointsInTime = len(qsts["time"])
 outDSS = dict()
 
+
 ####
+# preprocess penalty factors
+###
+pf = pd.Series(np.ones(len(qsts["dpdp"]["nodes"])), index=qsts["dpdp"]["nodes"])
+outDSS['pf'] = pf
+####
+
 # preprocess load
 ###
 nodes = qsts["dpdp"]["nodes"]
@@ -220,6 +227,7 @@ outDSS['dvdp'] = dvdp
 # line costs
 Pijcost = 0.0 * np.zeros((len(PTDF), PointsInTime))
 clin = np.reshape(Pijcost.T, (1,Pijcost.size), order="F")
+outDSS['clin'] = clin
 
 # define line limits
 bpns = qsts["dpdp"]["bpns"]
@@ -238,20 +246,91 @@ for br in qsts["branch"]:
 # Lmaxi = pd.DataFrame(np.asarray([ldict[n] for n in bpns]), np.asarray(bpns))
 Lmaxi = 2000 * np.ones((len(PTDF),1))
 Lmax = np.kron(Lmaxi, np.ones((1,PointsInTime)))
-Lmax = pd.DataFrame(Lmax, index=np.asarray(bpns))
-outDSS['Pjk_lim'] = Lmax
+Pjk_lim = pd.DataFrame(Lmax, index=np.asarray(bpns))
+outDSS['Pjk_lim'] = Pjk_lim
 
-# # optimization
-# for ba, batSize in enumerate(batSizes): 
-#     for pv, pvSize in enumerate(pvSizes):
-#         #Energy scheduling driver function   
-#         outGen, outDR, outPchar, outPdis, outLMP, costPdr, cgn, mobj = schedulingDriver(batSize, pvSize, DIR, 'Dispatch', 'h', DIR, InFile1, outDSS, dispatch, vmin, vmax, plot=plot)
-#         # outES = save_ES(script_path, outGen, outDR, outPchar, outPdis)
+####
+# preprocess generation
+####
+# costs
+Gcost = 10000 * np.ones(dfDemand.shape)
+cost = np.asarray([18.78, 19.35, 19.6, 20.28, 27.69, 34.93, 36.33, 31.69, 29.4, 28.7, 28.49, 25.97, 19.61, 18.65, 17.95, 17.65, 17.8, 18.26, 19.43, 25.88, 19.35, 19.81, 21.46, 19.16])  # in $/MWh
+Gcost[0,:] = cost * 1e-3 # in $/kWh
+Gcost[1,:] = cost * 1e-3 # in $/kWh
+Gcost[2,:] = cost * 1e-3 # in $/kWh
+subCost = pd.DataFrame(Gcost[0:3,:], index=PTDF.columns[0:3])
+cgn = np.reshape(Gcost.T, (1, Gcost.size), order="F")
+outDSS['cgn'] = cgn
+
+# limits
+Gmax = np.zeros((len(PTDF.columns), 1))
+Gmax[0,0] = 2000 # [kW] asume the slack conventional phase is here
+Gmax[1,0] = 2000 # [kW] asume the slack conventional phase is here
+Gmax[2,0] = 2000 # [kW] asume the slack conventional phase is here
+max_profile = np.kron(Gmax, np.ones((1,PointsInTime)))
+Gmax = np.reshape(max_profile.T, (1,np.size(max_profile)), order='F')
+outDSS['Gmax'] = Gmax
+
+####
+# preprocess demand response
+####
+
+# cost
+# DRcost = 1.0 # in $/kWh
+# cdr = DRcost*np.ones((1, n * PointsInTime)) 
+np.random.seed(2024) # Set random seed so results are repeatable
+DRcost = np.random.rand(1, len(PTDF.columns)) 
+cdr = np.kron(DRcost, np.ones((1,PointsInTime))) 
+outDSS['cdr'] = cdr
+
+# initial
+Pdr_0 = pd.DataFrame(0.0, index = np.asarray(nodes), columns = np.arange(PointsInTime))
+outDSS['Pdr_0'] = Pdr_0
+
+####
+# preprocess storage
+####
+
+batt = dict()
+numBatteries= 6
+batt['numBatteries'] = numBatteries
+BatIncidence = np.zeros((len(PTDF.columns),numBatteries))
+BatIncidence[PTDF.columns == '18.1', 0] = 1  # same nodes as Julia for 123Bus
+BatIncidence[PTDF.columns == '18.2', 1] = 1
+BatIncidence[PTDF.columns == '18.3', 2] = 1
+BatIncidence[PTDF.columns == '97.1', 3] = 1
+BatIncidence[PTDF.columns == '97.2', 4] = 1
+BatIncidence[PTDF.columns == '97.3', 5] = 1
+batt['BatIncidence'] = BatIncidence
+BatSizes = 20 * np.ones((1, numBatteries))  # [kWh] same as capacity in the julia code
+batt['BatSizes'] = BatSizes
+BatChargingLimits = 7.6*np.ones((1,numBatteries)) # [kWh]
+batt['BatChargingLimits'] = BatChargingLimits
+BatEfficiencies = 0.90*np.ones((1,numBatteries))
+batt['BatEfficiencies'] = BatEfficiencies
+BatInitEnergy = BatSizes * 0.4 
+batt['BatInitEnergy'] = BatInitEnergy
+Pbatcost = 0                                # This parameter is importat for cost analysis puposes $/kWh
+batt['Pbatcost'] = Pbatcost
+ccharbat = Pbatcost * np.ones((1,2*numBatteries*PointsInTime))
+batt['ccharbat'] = ccharbat
+ccapacity = Pbatcost * np.ones((1, numBatteries*(PointsInTime + 1)))
+batt['ccapacity'] = ccapacity
+batt['BatPenalty'] = np.ones((1,numBatteries)) 
+outDSS['batt'] = batt 
 
 
+
+from Methods.SLP_dispatch import SLP_dispatch
+from Methods.LP_dispatch import LP_dispatch
+
+storage=False
+PTDF = PTDF.round()
+
+# optimization
 for ba, batSize in enumerate(batSizes): 
     for pv, pvSize in enumerate(pvSizes):
-        
+
         output_dir1 = pathlib.Path(output_dir14).joinpath(f"bat_{ba}_pv_{pv}")
         if not os.path.isdir(output_dir1):
             os.mkdir(output_dir1)
@@ -259,20 +338,46 @@ for ba, batSize in enumerate(batSizes):
         title = f"init_LMP_dispatch_{dispatch}_bat_{batSize}_pv_{pvSize}"
         print(title)
 
-        ####################################
-        # First thing: compute the initial Dispatch
-        ####################################
         demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, outDSS=outDSS, plot=plot, freq="h", dispatchType=dispatch)
 
-        # save initial LMP
-        plt.clf()
-        fig, ax = plt.subplots(figsize=(h,w))
-        LMP.T.plot(legend=False)
-        ax.set_title(title)
-        fig.tight_layout()
-        output_img = os.path.join(DIR, title + ext)
-        plt.savefig(output_img)
-        plt.close('all')
+        # call the OPF method
+        if dispatch == 'SLP':
+            # create an instance of the dispatch class
+            dispatch_obj = SLP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
+            x, m, LMP = dispatch_obj.PTDF_SLP_OPF(dfDemand, Pjk_0, Vm_0, Pg_0, Pdr_0)
+        else:
+            dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
+            x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(dfDemand, Pjk_0, Vm_0, Pg_0, Pdr_0)
+        
+        print('Obj: %g' % m.objVal) 
+
+# for ba, batSize in enumerate(batSizes): 
+#     for pv, pvSize in enumerate(pvSizes):
+        
+#         output_dir1 = pathlib.Path(output_dir14).joinpath(f"bat_{ba}_pv_{pv}")
+#         if not os.path.isdir(output_dir1):
+#             os.mkdir(output_dir1)
+            
+#         title = f"init_LMP_dispatch_{dispatch}_bat_{batSize}_pv_{pvSize}"
+#         print(title)
+
+#         ####################################
+#         # First thing: compute the initial Dispatch
+#         ####################################
+#         demandProfile, LMP, OperationCost, mOperationCost = SLP_LP_scheduling(batSize, pvSize, output_dir1, vmin, vmax, outDSS=outDSS, plot=plot, freq="h", dispatchType=dispatch)
+
+#         LMP = pd.concat([subCost, LMP], axis=0)
+#         print(LMP.head())
+
+#         # save initial LMP
+#         plt.clf()
+#         fig, ax = plt.subplots(figsize=(h,w))
+#         LMP.T.plot(legend=False)
+#         ax.set_title(title)
+#         fig.tight_layout()
+#         output_img = os.path.join(DIR, title + ext)
+#         plt.savefig(output_img)
+#         plt.close('all')
         
         # LMP = LMP.iloc[3:,:] # remove first 3 rows
                 

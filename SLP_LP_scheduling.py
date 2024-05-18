@@ -49,16 +49,16 @@ def SLP_LP_scheduling(batSize, pvSize, output_dir, vmin, vmax, outDSS, plot=Fals
         computeSensitivity(script_path, case, dss, dss_file, plot)
     
     # load PTDF
-    PTDF_file = os.path.join(script_path, "inputs", case,"PTDF_jk.pkl")
-    PTDF = pd.read_pickle(PTDF_file)
-    PTDF = PTDF / 10 # divide by perturbation injection value
+    # PTDF_file = os.path.join(script_path, "inputs", case,"PTDF_jk.pkl")
+    # PTDF = pd.read_pickle(PTDF_file)
+    # PTDF = PTDF / 10 # divide by perturbation injection value
 
     # assert np.all(PTDF.round() == outDSS["PTDF"].round()), "PTDF values do not match"
 
     # voltage sensitivity
-    dfVS_file = os.path.join(script_path, "inputs", case, "VoltageSensitivity.pkl")
-    dfVS = pd.read_pickle(dfVS_file)
-    dfVS = dfVS / 10 # divide by perturbation injection value
+    # dfVS_file = os.path.join(script_path, "inputs", case, "VoltageSensitivity.pkl")
+    # dfVS = pd.read_pickle(dfVS_file)
+    # dfVS = dfVS / 10 # divide by perturbation injection value
 
     # load dvdp
 

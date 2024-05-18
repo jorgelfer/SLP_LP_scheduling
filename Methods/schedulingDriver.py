@@ -159,102 +159,44 @@ def compute_penaltyFactors(batt, PTDF):
 def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, case, outDSS, dispatchType, vmin, vmax, PF=False, voltage=True, DR=True, plot=False):
     
     # define Storage and PV
-    if batSize == 0:
-        storage=False
-    else:
-        storage=True
-    sbus='83'
-
-    if pvSize == 0:
-        PV=False
-    else:
-        PV=True
-    pv1bus='66'
-    pv2bus='80' 
+    storage=False
 
     # extract DSS results
-    loadNames     = outDSS['loadNames'] 
-    Pg_0     = outDSS['initPower']
-    v_0     = outDSS['initVolts']
+    loadNames = outDSS['loadNames'] 
+    Pg_0 = outDSS['initPower']
+    v_0 = outDSS['initVolts']
     v_base = outDSS['nodeBaseVolts']
     Pjk_0 = outDSS['initPjks']
     demandProfile = outDSS['initDemand']
-    demandProfilei = demandProfile.any(axis=1)
-    PDR_0 = pd.DataFrame(np.zeros(v_0.shape), index=Pg_0.index, columns=Pg_0.columns)
-    pointsInTime = v_0.shape[1]
-    
-    # load PTDF results
     PTDF = outDSS['PTDF']
-    n = len(PTDF.columns)
-    l = len(PTDF)
-        
-    # Storage
-    batt = create_battery(PTDF, pointsInTime, sbus, batSize)
-    
-    #Penalty factors
-    if PF:
-        batt, pf, Snodes = compute_penaltyFactors(batt, PTDF)
-    else:
-        pf = pd.Series(np.ones(n), index=PTDF.columns)
-        Snodes = np.where(np.any(batt["BatIncidence"],1))[0]
-        
-    # round the PTDF to make the optimization work
-    PTDF = PTDF.round()
-    
-    # Line costs
-    pijCost = 0.0*np.ones((l,pointsInTime))
-    clin = np.reshape(pijCost.T, (1,pijCost.size), order="F")
-    
-    ## Generation settings
-    # Load generation costs
-    gCost, cost_wednesday = load_generationCosts(script_path, n, pointsInTime, freq)
-    subCost = pd.DataFrame(gCost[0:3,:], index=PTDF.columns[0:3], columns=v_0.columns)
-
-    # Define generation limits
-    Gmax = np.zeros((n,1))
-    Gmax[0,0] = 2000 # asume the slack conventional phase is here
-    Gmax[1,0] = 2000 # asume the slack conventional phase is here
-    Gmax[2,0] = 2000 # asume the slack conventional phase is here
-    
-    # Line limits and info          
+    Pdr_0 = outDSS['Pdr_0'] 
+    pf = outDSS["pf"]
+    clin = outDSS['clin']
     Pjk_lim = outDSS['Pjk_lim']
-    
-    #Demand Response (cost of shedding load)
-    np.random.seed(2022) # Set random seed so results are repeatable
-    DRcost = np.random.rand(1,n) 
-    cdr = np.kron(DRcost, np.ones((1,pointsInTime))) 
-    
-    #PV system
-    if PV:
-        Gmax, gCost, PVnodes, PVProfile = create_PVsystems(freq, Gmax, PTDF, gCost, cost_wednesday, pointsInTime, pv1bus, pv2bus, pvSize)
-        # Normal gen
-        max_profile = np.kron(Gmax, np.ones((1,pointsInTime)))
-        # PV nodes
-        max_profile[PVnodes,:] = max_profile[PVnodes,:] * PVProfile
-    else:
-        PVnodes = None
-        # Normal gen
-        max_profile = np.kron(Gmax, np.ones((1,pointsInTime)))
-        
-    # Overall Generation limits:
-    Gmax = np.reshape(max_profile.T, (1,np.size(max_profile)), order='F')
-    
-    # Overall Generation costs:
-    cgn = np.reshape(gCost.T, (1,gCost.size), order="F")
-    
-    # load voltage base at each node
+    cdr = outDSS['cdr']
+    Gmax = outDSS['Gmax']
+    cgn = outDSS['cgn']
     dvdp = outDSS['dvdp']
-
+    batt = outDSS['batt']
+    
+    # derived values
+    PTDF = PTDF.round()
+    pointsInTime = v_0.shape[1]
+        
     # call the OPF method
     if dispatchType == 'SLP':
         # create an instance of the dispatch class
         dispatch_obj = SLP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
-        x, m, LMP = dispatch_obj.PTDF_SLP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0)
+        x, m, LMP = dispatch_obj.PTDF_SLP_OPF(demandProfile, Pjk_0, v_0, Pg_0, Pdr_0)
     else:
         dispatch_obj = LP_dispatch(pf, PTDF, batt, Pjk_lim, Gmax, cgn, clin, cdr, v_base, dvdp, storage, vmin, vmax)
-        x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(demandProfile, Pjk_0, v_0, Pg_0, PDR_0)
+        x, m, LMP, Ain = dispatch_obj.PTDF_LP_OPF(demandProfile, Pjk_0, v_0, Pg_0, Pdr_0)
 
     print('Obj: %g' % m.objVal) 
+    PV=False
+    PVnodes = None
+    Snodes = np.where(np.any(batt["BatIncidence"],1))[0]
+
     #Create plot object
     plot_obj = plottingDispatch(output_dir, iterName, pointsInTime, script_path, vmin, vmin, PTDF=PTDF, dispatchType=dispatchType)
     
@@ -269,44 +211,9 @@ def schedulingDriver(batSize, pvSize, output_dir, iterName, freq, script_path, c
     
     # extract LMP results
     LMP_Pg, LMP_Pdr, LMP_Pij, LMP_Pchar, LMP_Pdis, LMP_E = plot_obj.extractLMP(LMP, DR, storage, batt)
-
+    demandProfilei = demandProfile.any(axis=1)
     lnodes = np.where(demandProfilei)[0]    
     # Define the output as Pandas DataFrame
     outGen, outDR, outPchar, outPdis, outLMP = create_output(Pg, Pdr, Pchar, Pdis, LMP_Pg, loadNames, PTDF, lnodes=lnodes, Snodes=Snodes, PVnodes=PVnodes, timeVec=v_0.columns, PV=PV, storage=storage)
-    outLMP = pd.concat([subCost, outLMP], axis=0)
-    print(outLMP.head())
     
-    if plot:
-        
-        # plot demand response
-        if DR:
-            plot_obj.plot_DemandResponse(outDR)
-        
-        # plot Dispatch
-        dfPg = pd.DataFrame(Pg, PTDF.columns, v_0.columns)
-        plot_obj.plot_Dispatch(dfPg)
-        
-        # plot Storage
-        if storage:
-            plot_obj.plot_storage(E, batt, gCost[0,:])
-        
-        ## ploting LMPs
-        # plot_obj.plot_LMP(outLMP, 'gen')
-        
-        # if LMP_Pdr is not None:
-        #     LMP_Pdr = pd.DataFrame(LMP_Pdr, PTDF.columns, v_0.columns)
-        #     plot_obj.plot_LMP(LMP_Pdr,'DR')
-        
-        # if LMP_Pchar is not None:
-        #     LMP_Pchar = pd.DataFrame(LMP_Pchar, PTDF.columns[Snodes], v_0.columns)
-        #     plot_obj.plot_LMP(LMP_Pchar,'Scharge')
-
-        # if LMP_Pdis is not None:
-        #     LMP_Pdis = pd.DataFrame(LMP_Pdis, PTDF.columns[Snodes], v_0.columns)
-        #     plot_obj.plot_LMP(LMP_Pdis,'Sdischarge')
-
-        # if LMP_E is not None:
-        #     LMP_E = pd.DataFrame(LMP_E, PTDF.columns[Snodes], v_0.columns)
-        #     plot_obj.plot_LMP(LMP_E,'E')
-
     return outGen, outDR, outPchar, outPdis, outLMP, costPdr, cgn, m.objVal
